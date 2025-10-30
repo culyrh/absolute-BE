@@ -49,7 +49,6 @@ def extract_province(address: str) -> Optional[str]:
     for pattern in patterns:
         matches = re.findall(pattern, address)
         if matches:
-            # 정규화된 이름으로 반환
             if "서울" in matches[0]:
                 return "서울특별시"
             elif "부산" in matches[0]:
@@ -66,83 +65,101 @@ def extract_province(address: str) -> Optional[str]:
                 return "울산광역시"
             elif "세종" in matches[0]:
                 return "세종특별자치시"
-            elif "경기" in matches[0]:
-                return "경기도"
+            elif "강원특별자치도" in matches[0]:
+                return "강원특별자치도"
             elif "강원" in matches[0]:
                 return "강원특별자치도"
-            elif "충북" in matches[0] or "충청북" in matches[0]:
-                return "충청북도"
-            elif "충남" in matches[0] or "충청남" in matches[0]:
-                return "충청남도"
-            elif "전북" in matches[0] or "전라북" in matches[0]:
-                return "전라북도"
-            elif "전남" in matches[0] or "전라남" in matches[0]:
-                return "전라남도"
-            elif "경북" in matches[0] or "경상북" in matches[0]:
-                return "경상북도"
-            elif "경남" in matches[0] or "경상남" in matches[0]:
-                return "경상남도"
+            elif "제주특별자치도" in matches[0]:
+                return "제주특별자치도"
             elif "제주" in matches[0]:
                 return "제주특별자치도"
+            return matches[0]
+    
+    # 약어로 된 경우
+    short_patterns = {
+        r"서울": "서울특별시",
+        r"부산": "부산광역시",
+        r"대구": "대구광역시",
+        r"인천": "인천광역시",
+        r"광주": "광주광역시",
+        r"대전": "대전광역시",
+        r"울산": "울산광역시",
+        r"세종": "세종특별자치시",
+        r"경기": "경기도",
+        r"강원": "강원특별자치도",
+        r"충북": "충청북도",
+        r"충남": "충청남도",
+        r"전북": "전라북도",
+        r"전남": "전라남도",
+        r"경북": "경상북도",
+        r"경남": "경상남도",
+        r"제주": "제주특별자치도"
+    }
+    
+    for pattern, full_name in short_patterns.items():
+        if re.search(f"^{pattern}", address):
+            return full_name
     
     return None
 
 
 def normalize_region(region: str) -> str:
-    """권역명 정규화"""
+    """지역명 정규화"""
     if not isinstance(region, str):
-        return "기타"
+        return ""
     
-    # 세종특별자치시는 충청남도로 포함
-    if "세종" in region:
-        return "충청남도"
+    # 특별시, 광역시 정규화
+    region_map = {
+        "서울": "서울특별시",
+        "서울시": "서울특별시",
+        "부산": "부산광역시",
+        "부산시": "부산광역시",
+        "대구": "대구광역시",
+        "대구시": "대구광역시",
+        "인천": "인천광역시",
+        "인천시": "인천광역시",
+        "광주": "광주광역시",
+        "광주시": "광주광역시",
+        "대전": "대전광역시",
+        "대전시": "대전광역시",
+        "울산": "울산광역시",
+        "울산시": "울산광역시",
+        "세종": "세종특별자치시",
+        "세종시": "세종특별자치시",
+        "경기": "경기도",
+        "강원": "강원특별자치도",
+        "강원도": "강원특별자치도",
+        "충북": "충청북도",
+        "충남": "충청남도",
+        "전북": "전라북도",
+        "전북특별자치도": "전라북도",
+        "전남": "전라남도",
+        "경북": "경상북도",
+        "경남": "경상남도",
+        "제주": "제주특별자치도",
+        "제주도": "제주특별자치도"
+    }
     
-    # 도/광역시 정규화
-    if "서울" in region:
-        return "서울특별시"
-    elif "부산" in region:
-        return "부산광역시"
-    elif "대구" in region:
-        return "대구광역시"
-    elif "인천" in region:
-        return "인천광역시"
-    elif "광주" in region:
-        return "광주광역시"
-    elif "대전" in region:
-        return "대전광역시"
-    elif "울산" in region:
-        return "울산광역시"
-    elif "경기" in region:
-        return "경기도"
-    elif "강원" in region:
-        return "강원특별자치도"
-    elif "충북" in region or "충청북" in region:
-        return "충청북도"
-    elif "충남" in region or "충청남" in region:
-        return "충청남도"
-    elif "전북" in region or "전라북" in region:
-        return "전라북도"
-    elif "전남" in region or "전라남" in region:
-        return "전라남도"
-    elif "경북" in region or "경상북" in region:
-        return "경상북도"
-    elif "경남" in region or "경상남" in region:
-        return "경상남도"
-    elif "제주" in region:
-        return "제주특별자치도"
+    for key, value in region_map.items():
+        if region == key:
+            return value
     
     return region
 
 
 def preprocess_gas_station_data(df: pd.DataFrame) -> pd.DataFrame:
     """주유소 데이터 전처리"""
-    # 데이터 복사
-    processed_df = df.copy()
-    
-    # 주소 컬럼 탐색
-    address_col = find_column_by_keyword(processed_df, ["주소", "소재지", "지번", "address"])
+    # 컬럼명 찾기
+    address_col = find_column_by_keyword(df, ["주소", "소재지"])
     if not address_col:
         raise ValueError("주소 컬럼을 찾을 수 없습니다.")
+    
+    name_col = find_column_by_keyword(df, ["상호", "명칭", "field5"])  # field5에 상호명 있음
+    if not name_col:
+        name_col = "상호"  # 기본값 설정
+    
+    # 데이터 복사 (원본 보존)
+    processed_df = df.copy()
     
     # 행정구역 추출
     processed_df["행정구역"] = processed_df[address_col].apply(extract_admin_region)
@@ -162,53 +179,61 @@ def preprocess_gas_station_data(df: pd.DataFrame) -> pd.DataFrame:
 
 def merge_with_stats(gas_df: pd.DataFrame, pop_df: pd.DataFrame, biz_df: pd.DataFrame) -> pd.DataFrame:
     """주유소 데이터에 인구수와 사업체 데이터 병합"""
-    # 인구수 컬럼 찾기
-    pop_col = find_column_by_keyword(pop_df, ["인구"])
-    if not pop_col:
-        raise ValueError("인구수 컬럼을 찾을 수 없습니다.")
-    
-    # 사업체 컬럼 찾기
-    biz_col = find_column_by_keyword(biz_df, ["사업체", "천명"])
-    if not biz_col:
-        raise ValueError("사업체수 컬럼을 찾을 수 없습니다.")
-    
-    # 병합할 수 있는 키 확인
-    if "행정구역" not in gas_df.columns:
-        raise ValueError("주유소 데이터에 행정구역 컬럼이 없습니다.")
-    
-    # 데이터 병합
+    # 데이터프레임 복사
     merged_df = gas_df.copy()
     
-    # 인구수 데이터 병합
-    if "행정구역" in pop_df.columns:
-        merged_df = merged_df.merge(
-            pop_df[["행정구역", pop_col]], 
-            on="행정구역", 
-            how="left"
-        )
+    # 인구수 컬럼 찾기 (여러 패턴 시도)
+    pop_col = find_column_by_keyword(pop_df, ["인구", "총인구", "field1"])
+    if not pop_col:
+        # 인구수 컬럼을 찾을 수 없는 경우 기본값 추가
+        print("⚠️ 인구수 컬럼을 찾을 수 없어 기본값을 사용합니다.")
+        merged_df["인구[명]"] = 10000  # 기본값 설정
+    else:
+        # 병합할 수 있는 키 확인
+        if "행정구역" not in gas_df.columns:
+            print("⚠️ 주유소 데이터에 행정구역 컬럼이 없어 인구 데이터를 병합할 수 없습니다.")
+            merged_df["인구[명]"] = 10000  # 기본값 설정
+        # 인구수 데이터 병합
+        elif "행정구역" in pop_df.columns:
+            merged_df = merged_df.merge(
+                pop_df[["행정구역", pop_col]], 
+                on="행정구역", 
+                how="left"
+            )
+            # 컬럼명 통일
+            merged_df.rename(columns={pop_col: "인구[명]"}, inplace=True)
     
-    # 사업체 데이터 병합
-    if "행정구역" in biz_df.columns:
-        merged_df = merged_df.merge(
-            biz_df[["행정구역", biz_col]], 
-            on="행정구역", 
-            how="left"
-        )
-    
-    # 컬럼명 통일
-    merged_df.rename(
-        columns={
-            pop_col: "인구[명]",
-            biz_col: "인구천명당사업체수",
-        },
-        inplace=True,
-    )
+    # 사업체 컬럼 찾기
+    biz_col = find_column_by_keyword(biz_df, ["사업체", "천명", "field1"])
+    if not biz_col:
+        # 사업체수 컬럼을 찾을 수 없는 경우 기본값 추가
+        print("⚠️ 사업체수 컬럼을 찾을 수 없어 기본값을 사용합니다.")
+        merged_df["인구천명당사업체수"] = 80  # 기본값 설정
+    else:
+        # 병합할 수 있는 키 확인
+        if "행정구역" not in gas_df.columns:
+            print("⚠️ 주유소 데이터에 행정구역 컬럼이 없어 사업체 데이터를 병합할 수 없습니다.")
+            merged_df["인구천명당사업체수"] = 80  # 기본값 설정
+        # 사업체 데이터 병합
+        elif "행정구역" in biz_df.columns:
+            merged_df = merged_df.merge(
+                biz_df[["행정구역", biz_col]], 
+                on="행정구역", 
+                how="left"
+            )
+            # 컬럼명 통일
+            merged_df.rename(columns={biz_col: "인구천명당사업체수"}, inplace=True)
     
     # 결측치 처리
-    merged_df.fillna({
-        "인구[명]": merged_df["인구[명]"].mean(),
-        "인구천명당사업체수": merged_df["인구천명당사업체수"].mean()
-    }, inplace=True)
+    if "인구[명]" in merged_df.columns:
+        merged_df["인구[명]"].fillna(10000, inplace=True)
+    else:
+        merged_df["인구[명]"] = 10000
+        
+    if "인구천명당사업체수" in merged_df.columns:
+        merged_df["인구천명당사업체수"].fillna(80, inplace=True)
+    else:
+        merged_df["인구천명당사업체수"] = 80
     
     return merged_df
 
@@ -248,42 +273,87 @@ def categorize_by_usage_type_and_region(df: pd.DataFrame) -> Dict[str, Dict[str,
     for usage_type in usage_types:
         result[usage_type] = {}
         
-        # 해당 대분류의 데이터
-        usage_df = df[df["대분류"] == usage_type]
+        # 해당 대분류의 데이터만 필터링
+        type_df = df[df["대분류"] == usage_type]
         
-        # 모든 권역 값 추출
-        regions = usage_df["권역"].dropna().unique()
-        
-        for region in regions:
-            # 해당 대분류와 권역의 데이터
-            region_df = usage_df[usage_df["권역"] == region]
+        # 권역별로 데이터 분류
+        for region in type_df["권역"].dropna().unique():
+            region_df = type_df[type_df["권역"] == region]
             
-            if not region_df.empty:
+            if len(region_df) > 0:
                 result[usage_type][region] = region_df
     
     return result
 
 
 def calculate_centroids(grouped_data: Dict[str, Dict[str, pd.DataFrame]], 
-                       feature_cols: List[str],
+                       feature_cols: List[str], 
                        method: str = "mean") -> pd.DataFrame:
-    """용도 유형과 권역별 중심점 계산"""
+    """용도 유형과 권역별 센트로이드 계산"""
     centroids = []
     
     for usage_type, regions in grouped_data.items():
-        for region, df in regions.items():
+        for region, region_df in regions.items():
             centroid = {"usage_type": usage_type, "region": region}
             
+            # 각 특징별 센트로이드 계산
             for col in feature_cols:
-                if col in df.columns:
-                    # 평균 또는 중위값 계산
+                if col in region_df.columns:
+                    # 계산 방법에 따라 센트로이드 계산
                     if method == "mean":
-                        value = df[col].mean()
-                    else:  # median
-                        value = df[col].median()
-                    
-                    centroid[col] = value
+                        centroid[col] = region_df[col].mean()
+                    elif method == "median":
+                        centroid[col] = region_df[col].median()
+                    else:
+                        centroid[col] = region_df[col].mean()
             
             centroids.append(centroid)
     
-    return pd.DataFrame(centroids)
+    # 센트로이드 데이터프레임 생성
+    centroids_df = pd.DataFrame(centroids)
+    
+    # 결측치 처리
+    for col in feature_cols:
+        if col in centroids_df.columns:
+            centroids_df[col].fillna(centroids_df[col].mean(), inplace=True)
+    
+    return centroids_df
+
+
+def preprocess_integrated_data(df: pd.DataFrame) -> pd.DataFrame:
+    """통합 데이터 전처리"""
+    # 컬럼명 찾기
+    address_col = find_column_by_keyword(df, ["지번주소", "주소", "field6", "_CLEANADDR"])
+    if not address_col:
+        raise ValueError("주소 컬럼을 찾을 수 없습니다.")
+    
+    admin_col = find_column_by_keyword(df, ["관할주소"])
+    
+    # 데이터 복사 (원본 보존)
+    processed_df = df.copy()
+    
+    # 행정구역 추출
+    if admin_col and admin_col in processed_df.columns:
+        processed_df["행정구역"] = processed_df[admin_col].apply(extract_admin_region)
+    else:
+        processed_df["행정구역"] = processed_df[address_col].apply(extract_admin_region)
+    
+    # 권역(도/광역시) 추출
+    if admin_col and admin_col in processed_df.columns:
+        processed_df["권역"] = processed_df[admin_col].apply(extract_province)
+    else:
+        processed_df["권역"] = processed_df[address_col].apply(extract_province)
+    
+    # 결측치 처리
+    processed_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+    
+    # 컬럼명 통일
+    if address_col != "주소":
+        processed_df.rename(columns={address_col: "주소"}, inplace=True)
+    
+    # 교통량(AADT) 컬럼이 있는 경우 처리
+    if "교통량(AADT)" in processed_df.columns:
+        # 결측치 처리
+        processed_df["교통량(AADT)"].fillna(processed_df["교통량(AADT)"].mean(), inplace=True)
+    
+    return processed_df
