@@ -18,8 +18,8 @@ class Settings(BaseSettings):
     # 데이터 경로
     DATA_DIR: str = "data"
     GAS_STATION_FILE: str = "jeonju_gas_station.csv"
-    POPULATION_FILE: str = "전국인구수.xlsx"
-    BUSINESS_FILE: str = "전국1000명당사업체수.xlsx"
+    POPULATION_FILE: str = "전국인구수_행정동별.csv"
+    BUSINESS_FILE: str = "전국1000명당사업체수_행정동별.csv"
     CENTER_FILE: str = "대분류_센터로이드.csv"
     RECOMMEND_RESULT_FILE: str = "추천결과_행단위.csv"
     CLOSED_GAS_STATION_FILE: str = "폐주유소좌표변환.csv"  # 파일명 수정 - 실제 존재하는 파일 사용

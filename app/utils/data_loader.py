@@ -27,7 +27,7 @@ def load_population_data() -> pd.DataFrame:
     """인구수 데이터 로드"""
     try:
         file_path = DATA_DIR / settings.POPULATION_FILE
-        df = pd.read_excel(file_path)
+        df = pd.read_csv(file_path)
         print(f"📊 인구수 데이터 로드 완료: {len(df)}개 행")
         return df
     except Exception as e:
@@ -39,7 +39,7 @@ def load_business_data() -> pd.DataFrame:
     """사업체 데이터 로드"""
     try:
         file_path = DATA_DIR / settings.BUSINESS_FILE
-        df = pd.read_excel(file_path)
+        df = pd.read_csv(file_path)
         print(f"📊 사업체 데이터 로드 완료: {len(df)}개 행")
         return df
     except Exception as e:
