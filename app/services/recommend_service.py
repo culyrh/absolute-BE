@@ -120,6 +120,8 @@ class RecommendationService:
             recommendations = self.recommend_by_pearson_correlation(filtered_df, top_k)
         elif algorithm == RecommendationAlgorithm.EUCLIDEAN_DISTANCE:
             recommendations = self.recommend_by_euclidean_distance(filtered_df, top_k)
+        elif algorithm == RecommendationAlgorithm.AHP_TOPSIS:
+            recommendations = self.recommend_by_ahp_topsis(filtered_df, top_k, region)
         else:  # 기본값: 코사인 유사도
             recommendations = self.recommend_by_cosine_similarity(filtered_df, top_k)
         
@@ -457,4 +459,195 @@ class RecommendationService:
         
         except Exception as e:
             print(f"⚠️ 협업 필터링 기반 추천 실패: {str(e)}")
+            return []
+    
+    def recommend_by_ahp_topsis(self, df: pd.DataFrame, top_k: int = 10, region: Optional[str] = None) -> List[Dict[str, Any]]:
+        """권역 기반 AHP-TOPSIS 추천 알고리즘"""
+        try:
+            if len(df) == 0:
+                return []
+        
+            # 첫 번째 주소의 정보 추출
+            address_row = df.iloc[0]
+            address_region = address_row.get("권역", "")
+        
+            # 권역이 없는 경우, extract_province 함수로 주소에서 추출 시도
+            if not address_region:
+                address = address_row.get("주소", "")
+                address_region = extract_province(address)
+        
+            # 권역 정규화
+            if region:
+                # 사용자가 지정한 권역 사용
+                address_region = normalize_region(region)
+            elif address_region:
+                # 추출된 권역 정규화
+                address_region = normalize_region(address_region)
+            else:
+                # 권역을 찾을 수 없는 경우 기본값으로 "전라북도" 사용
+                address_region = "전라북도"
+        
+            # 추천 결과 데이터 가져오기
+            recommend_df = self.data.get("recommend_result", pd.DataFrame())
+        
+            # 권역별 데이터 필터링
+            region_df = recommend_df[recommend_df["권역"] == address_region] if "권역" in recommend_df.columns else recommend_df
+        
+            if len(region_df) == 0:
+                return []
+        
+            # 1. AHP 가중치 정의 (4개 지표)
+            # 여기서는 고정된 가중치를 사용하지만, 실제로는 쌍대비교행렬로부터 계산할 수 있습니다.
+            weights = {
+                "인구[명]_norm": 0.30,           # 인구밀도
+                "교통량_norm": 0.25,             # 교통량
+                "숙박업소(관광지수)_norm": 0.20,  # 관광지수
+                "상권밀집도(비율)_norm": 0.25     # 상권밀집도
+            }
+        
+            # 사용 가능한 특징 컬럼 확인
+            available_cols = [col for col in weights.keys() if col in address_row.index]
+        
+            if not available_cols:
+                return []
+        
+            # 2. 각 대안(용도 유형)별 지표 중위값 계산
+            usage_types = region_df["대분류"].unique() if "대분류" in region_df.columns else []
+
+            if len(usage_types) == 0:
+                # 대안이 없는 경우, 기본 대안 사용
+                usage_types = [
+                    "근린생활시설", "공동주택", "자동차관련시설", 
+                    "판매시설", "업무시설", "숙박시설",
+                    "공장", "가설건축", "기타"
+                ]
+        
+            # 3. 결정 행렬 생성
+            decision_matrix = {}
+        
+            for usage_type in usage_types:
+                # 해당 용도 유형과 권역의 데이터 필터링
+                type_df = region_df[region_df["대분류"] == usage_type] if "대분류" in region_df.columns else pd.DataFrame()
+            
+                if len(type_df) > 0:
+                    # 중위값 계산
+                    medians = {}
+                    for col in available_cols:
+                        if col in type_df.columns:
+                            medians[col] = type_df[col].median()
+                        else:
+                            medians[col] = 0.5  # 기본값
+
+                    decision_matrix[usage_type] = medians
+                else:
+                    # 데이터가 없는 경우 기본값 사용
+                    decision_matrix[usage_type] = {col: 0.5 for col in available_cols}
+        
+            # 4. 대상 주유소의 지표 값 추출
+            site_values = {}
+            for col in available_cols:
+                site_values[col] = float(address_row.get(col, 0))
+        
+            # 5. TOPSIS 알고리즘 적용
+            # 5.1. 유사도 점수 행렬 생성 (대상 주유소와 각 용도 유형의 중위값 간 유사도)
+            similarity_matrix = {}
+        
+            for usage_type, medians in decision_matrix.items():
+                distances = {}
+
+                for col in available_cols:
+                    # 절대 거리 계산
+                    distance = abs(site_values[col] - medians[col])
+                    distances[col] = 1 - distance  # 유사도로 변환 (값이 클수록 유사)
+
+                similarity_matrix[usage_type] = distances
+
+            # 5.2. 정규화 및 가중치 적용
+            weighted_matrix = {}
+        
+            for usage_type, similarities in similarity_matrix.items():
+                weighted = {}
+
+                for col in available_cols:
+                    weighted[col] = weights.get(col, 0) * similarities[col]
+
+                weighted_matrix[usage_type] = weighted
+
+            # 5.3. 이상해 및 반대해 계산
+            ideal_positive = {}
+            ideal_negative = {}
+        
+            for col in available_cols:
+                max_val = max(weighted_matrix[ut][col] for ut in weighted_matrix)
+                min_val = min(weighted_matrix[ut][col] for ut in weighted_matrix)
+
+                ideal_positive[col] = max_val
+                ideal_negative[col] = min_val
+        
+            # 5.4. 거리 계산
+            distances_positive = {}
+            distances_negative = {}
+        
+            for usage_type, weighted in weighted_matrix.items():
+                # 이상해와의 거리
+                dist_pos = sum((weighted[col] - ideal_positive[col]) ** 2 for col in available_cols) ** 0.5
+                # 반대해와의 거리
+                dist_neg = sum((weighted[col] - ideal_negative[col]) ** 2 for col in available_cols) ** 0.5
+
+                distances_positive[usage_type] = dist_pos
+                distances_negative[usage_type] = dist_neg
+        
+            # 5.5. 상대 근접도 계산
+            closeness = {}
+
+            for usage_type in weighted_matrix:
+                d_pos = distances_positive[usage_type]
+                d_neg = distances_negative[usage_type]
+            
+                # 0으로 나누기 방지
+                if d_pos + d_neg == 0:
+                    closeness[usage_type] = 0
+                else:
+                    closeness[usage_type] = d_neg / (d_pos + d_neg)
+
+            # 6. 결과 정렬 및 상위 추천 반환
+            sorted_results = sorted(
+                [(usage_type, score) for usage_type, score in closeness.items()],
+                key=lambda x: x[1],
+                reverse=True
+            )
+        
+            # 상위 top_k개 선택
+            top_results = sorted_results[:top_k]
+        
+            # 7. 결과 형식화
+            recommendations = []
+
+            for i, (usage_type, score) in enumerate(top_results):
+                recommendations.append({
+                    "address": address_row.get("주소", ""),
+                    "admin_region": address_row.get("행정구역", ""),
+                    "usage_type": usage_type,
+                    "score": float(score),
+                    "rank": i + 1,
+                    "population": float(address_row.get("인구[명]", 0)),
+                    "business_density": float(address_row.get("인구천명당사업체수", 0)),
+                    "population_norm": float(address_row.get("인구[명]_norm", 0)),
+                    "business_density_norm": float(address_row.get("인구천명당사업체수_norm", 0)),
+                    "traffic_norm": float(address_row.get("교통량_norm", 0) if "교통량_norm" in address_row else 0),
+                    "tourism_norm": float(address_row.get("숙박업소(관광지수)_norm", 0) if "숙박업소(관광지수)_norm" in address_row else 0),
+                    "land_price_norm": float(address_row.get("공시지가(토지단가)_norm", 0) if "공시지가(토지단가)_norm" in address_row else 0),
+                    "ahp_weights": weights,  # AHP 가중치 정보 추가
+                    "region": address_region,  # 권역 정보 추가
+                    "station_name": address_row.get("상호명", ""),
+                    "station_status": address_row.get("상태", ""),
+                    "note": address_row.get("비고", "")
+                })
+
+            return recommendations
+
+        except Exception as e:
+            print(f"⚠️ 권역 기반 AHP-TOPSIS 추천 실패: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return []

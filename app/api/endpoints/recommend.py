@@ -9,6 +9,7 @@ from app.api.dependencies import get_recommendation_service
 from app.services.recommend_service import RecommendationService
 
 
+# 라우터 생성
 router = APIRouter(
     prefix="/api/recommend",
     tags=["recommendations"],
@@ -16,6 +17,7 @@ router = APIRouter(
 )
 
 
+# 추천 시스템 API (POST)
 @router.post("", response_model=Dict[str, Any])
 async def recommend_usage(
     location: Dict[str, Any] = Body(..., description="위치 정보 (주소, 좌표 등)"),
@@ -68,6 +70,8 @@ async def recommend_usage(
             algorithm = RecommendationAlgorithm.PEARSON_CORRELATION
         elif algorithm_name == "euclidean_distance":
             algorithm = RecommendationAlgorithm.EUCLIDEAN_DISTANCE
+        elif algorithm_name == "ahp_topsis":
+            algorithm = RecommendationAlgorithm.AHP_TOPSIS
         
         # 주소 기반 추천 (기본)
         if address:
@@ -76,7 +80,7 @@ async def recommend_usage(
         
         # 좌표 기반 추천 (주소가 없고 좌표가 있는 경우)
         elif lat is not None and lng is not None:
-            # 여기에 좌표 기반 추천 로직 구현 (현재는 더미 데이터 반환)
+            # 여기에 좌표 기반 추천 로직 구현 (현재는 더미 데이터)
             # 실제 구현에서는 좌표에 가장 가까운 주유소를 찾아서 해당 주소로 추천 필요
             dummy_result = {
                 "query": f"{lat},{lng}",

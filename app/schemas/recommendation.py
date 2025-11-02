@@ -15,6 +15,7 @@ class RecommendationAlgorithm(str, Enum):
     COSINE_SIMILARITY = "cosine_similarity"  # 코사인 유사도
     PEARSON_CORRELATION = "pearson_correlation"  # 피어슨 상관계수
     EUCLIDEAN_DISTANCE = "euclidean_distance"  # 유클리드 거리
+    AHP_TOPSIS = "ahp_topsis"  # 권역 기반 AHP-TOPSIS
 
 
 class RecommendationRequest(BaseModel):
