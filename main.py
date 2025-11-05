@@ -12,7 +12,7 @@ import os
 # 실제 모듈 경로 확인
 if os.path.exists("app/api/endpoints/recommend.py"):
     # 기존 프로젝트 구조 사용
-    from app.api.endpoints import recommend, stations, usage_types
+    from app.api.endpoints import recommend, stations, usage_types, ml_recommend
     from app.core.config import settings
     
     # FastAPI 애플리케이션 생성
@@ -28,12 +28,14 @@ if os.path.exists("app/api/endpoints/recommend.py"):
     app.include_router(recommend.router)
     app.include_router(stations.router)
     app.include_router(usage_types.router)
+    app.include_router(ml_recommend.router)    #  ML기반추천 추가했습니다
 else:
     # 단순화된 구조 사용
     import recommend
     import stations
     import s3
-    
+    import ml_recommend # ml추가했습니다
+
     # FastAPI 애플리케이션 생성
     app = FastAPI(
         title="폐주유소 활용 추천 API",
@@ -47,6 +49,7 @@ else:
     app.include_router(recommend.router)
     app.include_router(stations.router)
     app.include_router(s3.router)
+    app.include_router(ml_recommend.router)    # ML기반추천 추가
 
 # CORS 미들웨어 설정
 app.add_middleware(
@@ -72,6 +75,7 @@ def read_root():
             "api/stations/{id}": "개별 주유소 상세 정보",
             "api/stations/cases": "활용 사례 카드",
             "api/recommend": "추천 시스템",
+            "api/ml-recommend": "ML 기반 추천 시스템",  # 추가했습니다
             "api/s3/presigned": "S3 업로드 URL 발급 (예정)"
         }
     }
