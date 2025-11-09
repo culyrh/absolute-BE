@@ -19,7 +19,7 @@ from sklearn.preprocessing import StandardScaler
 
 class MLLocationRecommender:
     DATA_DIR_NAME = "data"
-    TRAIN_FILE_NAME = "temp_data - 시트1.csv"
+    TRAIN_FILE_NAME = "데이터 통합 - 시트1.csv"
     STATION_FILE_NAME = "gas_station_features.csv"
 
     FEATURE_COLS = ["인구[명]", "교통량(AADT)", "숙박업소(관광지수)", "상권밀집도(비율)"]

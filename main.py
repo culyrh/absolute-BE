@@ -34,7 +34,7 @@ else:
     import recommend
     import stations
     import s3
-    import ml_recommend # ml추가했습니다
+    import ml_recommend # ml 추가했습니다
 
     # FastAPI 애플리케이션 생성
     app = FastAPI(
