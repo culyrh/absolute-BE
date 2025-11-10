@@ -1,0 +1,13 @@
+name: Trigger Frontend Deploy on Backend Update
+
+on:
+  push:
+    branches: [ main ]  # 또는 배포용으로 쓰는 브랜치 이름
+
+jobs:
+  trigger-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel Redeploy
+        run: |
+          curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
