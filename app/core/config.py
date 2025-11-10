@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     RECOMMEND_RESULT_FILE: str = "추천결과_행단위.csv"
     CLOSED_GAS_STATION_FILE: str = "폐주유소좌표변환.csv"  # 파일명 수정 - 실제 존재하는 파일 사용
     # 데이터 통합 파일 경로 업데이트
-    INTEGRATED_DATA_FILE: str = "데이터 통합 - 시트1.csv"
+    INTEGRATED_DATA_FILE: str = "train.csv"
     
     # CORS 설정
     CORS_ORIGINS: List[str] = ["*"]

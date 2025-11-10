@@ -14,7 +14,7 @@ from app.core.config import settings, DATA_DIR
 def load_gas_station_data() -> pd.DataFrame:
     """주유소 데이터 로드"""
     try:
-        file_path = DATA_DIR / settings.GAS_STATION_FILE
+        file_path = DATA_DIR / settings.GAS_STATION_FILE   # "jeonju_gas_station.csv"
         df = pd.read_csv(file_path)
         print(f"📊 주유소 데이터 로드 완료: {len(df)}개 행")
         return df
@@ -26,7 +26,7 @@ def load_gas_station_data() -> pd.DataFrame:
 def load_population_data() -> pd.DataFrame:
     """인구수 데이터 로드"""
     try:
-        file_path = DATA_DIR / settings.POPULATION_FILE
+        file_path = DATA_DIR / settings.POPULATION_FILE   # "전국인구수_행정동별.csv"
         df = pd.read_csv(file_path)
         print(f"📊 인구수 데이터 로드 완료: {len(df)}개 행")
         return df
@@ -38,7 +38,7 @@ def load_population_data() -> pd.DataFrame:
 def load_business_data() -> pd.DataFrame:
     """사업체 데이터 로드"""
     try:
-        file_path = DATA_DIR / settings.BUSINESS_FILE
+        file_path = DATA_DIR / settings.BUSINESS_FILE   # "전국1000명당사업체수_행정동별.csv"
         df = pd.read_csv(file_path)
         print(f"📊 사업체 데이터 로드 완료: {len(df)}개 행")
         return df
@@ -50,7 +50,7 @@ def load_business_data() -> pd.DataFrame:
 def load_centroid_data() -> pd.DataFrame:
     """센트로이드 데이터 로드"""
     try:
-        file_path = DATA_DIR / settings.CENTER_FILE
+        file_path = DATA_DIR / settings.CENTER_FILE   # "대분류_센터로이드.csv"
         df = pd.read_csv(file_path)
         print(f"📊 센트로이드 데이터 로드 완료: {len(df)}개 행")
         return df
@@ -62,7 +62,7 @@ def load_centroid_data() -> pd.DataFrame:
 def load_recommend_result_data() -> pd.DataFrame:
     """추천 결과 행단위 데이터 로드"""
     try:
-        file_path = DATA_DIR / settings.RECOMMEND_RESULT_FILE
+        file_path = DATA_DIR / settings.RECOMMEND_RESULT_FILE   # "추천결과_행단위.csv"
         df = pd.read_csv(file_path)
         print(f"📊 추천 결과 데이터 로드 완료: {len(df)}개 행")
         return df
@@ -74,7 +74,7 @@ def load_recommend_result_data() -> pd.DataFrame:
 def load_closed_gas_station_data() -> pd.DataFrame:
     """폐/휴업 주유소 데이터 로드"""
     try:
-        file_path = DATA_DIR / settings.CLOSED_GAS_STATION_FILE
+        file_path = DATA_DIR / settings.CLOSED_GAS_STATION_FILE   # "폐주유소좌표변환.csv"
         df = pd.read_csv(file_path)
         
         # 컬럼 이름 매핑 - 새로운 CSV 파일 형식에 맞게 조정

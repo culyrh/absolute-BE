@@ -3,19 +3,19 @@
 
 사용법:
     python -m app.comparison.performance_test
+    
+테스트 데이터는 data/test_data.csv에 수동으로 준비되어 있어야 합니다.
 """
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Tuple
+from typing import Dict, List
 from datetime import datetime
 import time
 from pathlib import Path
 
 from app.utils.data_loader import load_all_data
-from app.utils.preprocessing import (
-    preprocess_gas_station_data, merge_with_stats, normalize_features
-)
+from app.utils.preprocessing import normalize_features
 from app.comparison.algorithms.cosine_similarity import CosineSimilarityAlgorithm
 from app.comparison.algorithms.euclidean_distance import EuclideanDistanceAlgorithm
 from app.comparison.algorithms.pearson_correlation import PearsonCorrelationAlgorithm
@@ -32,97 +32,72 @@ class PerformanceTest:
         self.train_data = None
         self.test_data = None
         self.centroids = None
-        self.norm_cols = None
+        self.feature_cols = ["인구[명]", "교통량", "숙박업소(관광지수)", "상권밀집도(비율)", "공시지가(토지단가)"]
+        self.norm_cols = [f"{col}_norm" for col in self.feature_cols]
         self.results = {}
         
     def load_data(self):
-        """데이터 로드 및 전처리"""
+        """데이터 로드"""
         print("📊 데이터 로딩 중...")
         
         # 모든 데이터 로드
         self.data = load_all_data()
         
-        # Train 데이터: 추천결과_행단위.csv (1,440개)
+        # Train 데이터: 추천결과_행단위.csv
         self.train_data = self.data["recommend_result"]
         print(f"✅ Train 데이터 로드: {len(self.train_data)}개")
         
         # 센트로이드 데이터
         self.centroids = self.data["centroid"]
         
-        # 정규화 컬럼
-        feature_cols = ["인구[명]", "교통량", "숙박업소(관광지수)", "상권밀집도(비율)", "공시지가(토지단가)"]
-        self.norm_cols = [f"{col}_norm" for col in feature_cols]
-        
-    def generate_test_data(self) -> pd.DataFrame:
+    def load_test_data(self, test_file_path: str = "data/test_data.csv"):
         """
-        증강 테스트 데이터 생성
+        수동으로 준비된 테스트 데이터 로드 (원본 형식)
         
-        방법: 대분류별 권역당 3개씩 생성
-        - 각 대분류의 권역별 중위값 기준
-        - 약간의 노이즈 추가하여 3개 샘플 생성
+        Args:
+            test_file_path: 테스트 데이터 파일 경로
+            
+        테스트 데이터 형식:
+        - 필수 컬럼: 대분류, 인구[명], 교통량(AADT), 숙박업소(관광지수), 상권밀집도(비율)
+        - 선택 컬럼: 지번주소, 관할주소, 위도, 경도
         """
-        print("\n🔬 테스트 데이터 생성 중...")
+        print(f"\n📂 테스트 데이터 로드 중: {test_file_path}")
         
-        # 대분류 목록
-        usage_types = self.train_data["대분류"].unique()
-        
-        # 권역 목록 (17개)
-        regions = self.train_data["권역"].unique() if "권역" in self.train_data.columns else []
-        
-        if len(regions) == 0:
-            regions = [
-                "서울특별시", "부산광역시", "대구광역시", "인천광역시",
-                "광주광역시", "대전광역시", "울산광역시", "세종특별자치시",
-                "경기도", "강원특별자치도", "충청북도", "충청남도",
-                "전북특별자치도", "전라남도", "경상북도", "경상남도", "제주특별자치도"
-            ]
-        
-        test_samples = []
-        
-        for usage_type in usage_types:
-            for region in regions:
-                # 해당 대분류 + 권역의 데이터 필터링
-                subset = self.train_data[
-                    (self.train_data["대분류"] == usage_type) &
-                    (self.train_data["권역"] == region)
-                ]
-                
-                if len(subset) > 0:
-                    # 중위값 계산
-                    available_norm_cols = [col for col in self.norm_cols if col in subset.columns]
-                    
-                    medians = {}
-                    for col in available_norm_cols:
-                        medians[col] = subset[col].median()
-                    
-                    # 3개 샘플 생성 (약간의 노이즈 추가)
-                    for i in range(3):
-                        sample = {
-                            "대분류": usage_type,
-                            "권역": region,
-                            "test_id": f"{usage_type}_{region}_{i+1}"
-                        }
-                        
-                        # 각 특징에 노이즈 추가 (±10% 범위)
-                        for col in available_norm_cols:
-                            noise = np.random.uniform(-0.1, 0.1)
-                            sample[col] = max(0, min(1, medians[col] + noise))
-                        
-                        # 원본 정보 (주소 등)
-                        if len(subset) > 0:
-                            sample_row = subset.iloc[0]
-                            sample["주소"] = f"{region} (테스트 샘플 {i+1})"
-                            sample["행정구역"] = sample_row.get("행정구역", region)
-                        
-                        test_samples.append(sample)
-        
-        self.test_data = pd.DataFrame(test_samples)
-        print(f"✅ 테스트 데이터 생성 완료: {len(self.test_data)}개")
-        print(f"   - 대분류 수: {len(usage_types)}")
-        print(f"   - 권역 수: {len(regions)}")
-        print(f"   - 샘플당 개수: 3개")
-        
-        return self.test_data
+        try:
+            self.test_data = pd.read_csv(test_file_path, encoding="utf-8-sig")
+            print(f"✅ 테스트 데이터 로드 완료: {len(self.test_data)}개")
+            
+            # 교통량(AADT) 컬럼명 통일
+            if "교통량(AADT)" in self.test_data.columns:
+                self.test_data.rename(columns={"교통량(AADT)": "교통량"}, inplace=True)
+            
+            # 필수 컬럼 확인
+            required_cols = ["대분류"] + self.feature_cols
+            missing_cols = [col for col in required_cols if col not in self.test_data.columns]
+            
+            if missing_cols:
+                print(f"⚠️ 경고: 다음 컬럼이 테스트 데이터에 없습니다: {missing_cols}")
+            
+            # 정규화 수행 (train 데이터와 동일한 방식)
+            available_cols = [col for col in self.feature_cols if col in self.test_data.columns]
+            self.test_data = normalize_features(self.test_data, available_cols)
+            
+            # 대분류 분포 출력
+            if "대분류" in self.test_data.columns:
+                print(f"   - 대분류 종류: {self.test_data['대분류'].nunique()}개")
+                print(f"   - 대분류 분포:\n{self.test_data['대분류'].value_counts()}")
+            
+            return self.test_data
+            
+        except FileNotFoundError:
+            print(f"❌ 오류: 테스트 데이터 파일을 찾을 수 없습니다: {test_file_path}")
+            print("   테스트 데이터를 data/test_data.csv에 수동으로 준비해주세요.")
+            print("\n   필수 형식:")
+            print("   대분류,지번주소 (읍/면/동),관할주소,인구[명],교통량(AADT),숙박업소(관광지수),상권밀집도(비율)")
+            raise
+        except Exception as e:
+            print(f"❌ 테스트 데이터 로드 실패: {str(e)}")
+            raise
     
     def run_algorithm_test(self, algorithm, algorithm_name: str) -> Dict:
         """단일 알고리즘 성능 테스트"""
@@ -142,7 +117,7 @@ class PerformanceTest:
         for idx, row in self.test_data.iterrows():
             # 정답
             true_label = row["대분류"]
-            region = row["권역"]
+            region = row.get("권역", "")
             
             # 테스트 데이터를 DataFrame으로 변환
             test_df = pd.DataFrame([row])
@@ -170,12 +145,13 @@ class PerformanceTest:
                         results["top5_correct"] += 1
                     
                     # 권역별 정확도
-                    if region not in results["region_accuracy"]:
-                        results["region_accuracy"][region] = {"correct": 0, "total": 0}
-                    
-                    results["region_accuracy"][region]["total"] += 1
-                    if recommendations[0]["usage_type"] == true_label:
-                        results["region_accuracy"][region]["correct"] += 1
+                    if region:
+                        if region not in results["region_accuracy"]:
+                            results["region_accuracy"][region] = {"correct": 0, "total": 0}
+                        
+                        results["region_accuracy"][region]["total"] += 1
+                        if recommendations[0]["usage_type"] == true_label:
+                            results["region_accuracy"][region]["correct"] += 1
                     
                     # 대분류별 정확도
                     if true_label not in results["usage_type_accuracy"]:
@@ -186,14 +162,14 @@ class PerformanceTest:
                         results["usage_type_accuracy"][true_label]["correct"] += 1
                         
             except Exception as e:
-                print(f"  ❌ 오류: {str(e)}")
+                print(f"  ❌ 오류 (인덱스 {idx}): {str(e)}")
                 results["execution_times"].append(0)
         
         # 정확도 계산
-        results["top1_accuracy"] = (results["top1_correct"] / results["total"]) * 100
-        results["top3_accuracy"] = (results["top3_correct"] / results["total"]) * 100
-        results["top5_accuracy"] = (results["top5_correct"] / results["total"]) * 100
-        results["avg_execution_time"] = np.mean(results["execution_times"]) * 1000  # ms
+        results["top1_accuracy"] = (results["top1_correct"] / results["total"]) * 100 if results["total"] > 0 else 0
+        results["top3_accuracy"] = (results["top3_correct"] / results["total"]) * 100 if results["total"] > 0 else 0
+        results["top5_accuracy"] = (results["top5_correct"] / results["total"]) * 100 if results["total"] > 0 else 0
+        results["avg_execution_time"] = np.mean(results["execution_times"]) * 1000 if results["execution_times"] else 0  # ms
         
         print(f"   ✅ Top-1 정확도: {results['top1_accuracy']:.2f}%")
         print(f"   ✅ Top-3 정확도: {results['top3_accuracy']:.2f}%")
@@ -210,17 +186,23 @@ class PerformanceTest:
         
         # 알고리즘 인스턴스 생성
         algorithms = {
+            "코사인 유사도": CosineSimilarityAlgorithm(
+                self.centroids, self.norm_cols
+            ),
+            "유클리드 거리": EuclideanDistanceAlgorithm(
+                self.centroids, self.norm_cols
+            ),
+            "피어슨 상관계수": PearsonCorrelationAlgorithm(
+                self.centroids, self.norm_cols
+            ),
+            "인기도 기반": PopularityAlgorithm(
+                self.centroids, self.norm_cols, self.train_data
+            ),
+            "협업 필터링": CollaborativeAlgorithm(
+                self.centroids, self.norm_cols, self.train_data
+            ),
             "AHP-TOPSIS": AHPTopsisAlgorithm(
                 self.centroids, self.norm_cols, self.train_data
-            ),
-            "기본 CF": CollaborativeAlgorithm(
-                self.centroids, self.norm_cols, self.train_data
-            ),
-            "코사인 유사도 CF": CosineSimilarityAlgorithm(
-                self.centroids, self.norm_cols
-            ),
-            "피어슨 상관계수 CF": PearsonCorrelationAlgorithm(
-                self.centroids, self.norm_cols
             ),
         }
         
@@ -252,9 +234,10 @@ class PerformanceTest:
         print("\n" + "="*70)
         
         # 최고 성능 알고리즘
-        best_algo = max(self.results.items(), key=lambda x: x[1]["top1_accuracy"])
-        print(f"🏆 최고 성능 알고리즘: {best_algo[0]}")
-        print(f"   Top-1 정확도: {best_algo[1]['top1_accuracy']:.2f}%")
+        if self.results:
+            best_algo = max(self.results.items(), key=lambda x: x[1]["top1_accuracy"])
+            print(f"🏆 최고 성능 알고리즘: {best_algo[0]}")
+            print(f"   Top-1 정확도: {best_algo[1]['top1_accuracy']:.2f}%")
         print("="*70 + "\n")
     
     def save_results(self):
@@ -283,18 +266,19 @@ class PerformanceTest:
         
         # 권역별 결과
         for algo_name, result in self.results.items():
-            region_data = []
-            for region, acc in result["region_accuracy"].items():
-                region_data.append({
-                    "권역": region,
-                    "정확도(%)": (acc["correct"] / acc["total"]) * 100 if acc["total"] > 0 else 0,
-                    "정확 수": acc["correct"],
-                    "전체 수": acc["total"]
-                })
-            
-            region_df = pd.DataFrame(region_data)
-            region_file = output_dir / f"region_{algo_name.replace(' ', '_')}_{timestamp}.csv"
-            region_df.to_csv(region_file, index=False, encoding="utf-8-sig")
+            if result["region_accuracy"]:
+                region_data = []
+                for region, acc in result["region_accuracy"].items():
+                    region_data.append({
+                        "권역": region,
+                        "정확도(%)": (acc["correct"] / acc["total"]) * 100 if acc["total"] > 0 else 0,
+                        "정확 수": acc["correct"],
+                        "전체 수": acc["total"]
+                    })
+                
+                region_df = pd.DataFrame(region_data)
+                region_file = output_dir / f"region_{algo_name.replace(' ', '_')}_{timestamp}.csv"
+                region_df.to_csv(region_file, index=False, encoding="utf-8-sig")
         
         print(f"💾 권역별 결과 저장 완료")
         
@@ -323,8 +307,15 @@ def main():
     # 1. 데이터 로드
     test.load_data()
     
-    # 2. 테스트 데이터 생성
-    test.generate_test_data()
+    # 2. 테스트 데이터 로드 (수동으로 준비된 데이터)
+    try:
+        test.load_test_data("data/test_data.csv")
+    except Exception as e:
+        print("\n❌ 테스트 데이터 로드 실패")
+        print("테스트 데이터를 data/test_data.csv에 준비해주세요.")
+        print("\n필수 형식:")
+        print("대분류,지번주소 (읍/면/동),관할주소,인구[명],교통량(AADT),숙박업소(관광지수),상권밀집도(비율)")
+        return
     
     # 3. 모든 알고리즘 테스트
     test.run_all_tests()

@@ -4,6 +4,8 @@ app/comparison/ml_performance_test.py
 
 사용법:
     python -m app.comparison.ml_performance_test
+    
+테스트 데이터는 data/ml_test_data.csv에 수동으로 준비되어 있어야 합니다.
 """
 
 import pandas as pd
@@ -37,60 +39,44 @@ class MLPerformanceTest:
         
         return accuracy, train_time
     
-    def generate_test_data(self) -> pd.DataFrame:
-        """증강 테스트 데이터 생성"""
-        print("\n🔬 테스트 데이터 생성 중...")
+    def load_test_data(self, test_file_path: str = "data/ml_test_data.csv"):
+        """
+        수동으로 준비된 ML 테스트 데이터 로드
         
-        train_df = self.recommender._load_train_df()
-        self.train_data = train_df
-        
-        usage_types = train_df["대분류"].unique()
-        
-        # 간단하게 권역 추출
-        regions = []
-        if "주소" in train_df.columns:
-            for addr in train_df["주소"]:
-                if isinstance(addr, str):
-                    parts = addr.split()
-                    if len(parts) > 0:
-                        region = parts[0]
-                        if region not in regions:
-                            regions.append(region)
-        
-        if len(regions) == 0:
-            regions = ["서울", "부산", "대구", "인천", "광주"]
-        
-        test_samples = []
-        
-        for usage_type in usage_types:
-            subset = train_df[train_df["대분류"] == usage_type]
+        Args:
+            test_file_path: 테스트 데이터 파일 경로
             
-            if len(subset) > 0:
-                medians = {}
-                for col in self.recommender.FEATURE_COLS:
-                    if col in subset.columns:
-                        medians[col] = subset[col].median()
-                
-                for region in regions[:5]:
-                    for i in range(3):
-                        sample = {
-                            "대분류": usage_type,
-                            "권역": region,
-                            "test_id": f"{usage_type}_{region}_{i+1}"
-                        }
-                        
-                        for col in self.recommender.FEATURE_COLS:
-                            if col in medians:
-                                noise = np.random.uniform(-0.1, 0.1)
-                                base_value = medians[col]
-                                sample[col] = max(0, base_value * (1 + noise))
-                        
-                        test_samples.append(sample)
+        테스트 데이터 형식:
+        - 필수 컬럼: 대분류, 인구[명], 교통량, 숙박업소(관광지수), 상권밀집도(비율), 공시지가(토지단가)
+        - 선택 컬럼: 권역, 주소, 행정구역
+        """
+        print(f"\n📂 ML 테스트 데이터 로드 중: {test_file_path}")
         
-        self.test_data = pd.DataFrame(test_samples)
-        print(f"✅ 테스트 데이터 생성 완료: {len(self.test_data)}개")
-        
-        return self.test_data
+        try:
+            self.test_data = pd.read_csv(test_file_path, encoding="utf-8-sig")
+            print(f"✅ 테스트 데이터 로드 완료: {len(self.test_data)}개")
+            
+            # 필수 컬럼 확인
+            required_cols = ["대분류"] + self.recommender.FEATURE_COLS
+            missing_cols = [col for col in required_cols if col not in self.test_data.columns]
+            
+            if missing_cols:
+                print(f"⚠️ 경고: 다음 컬럼이 테스트 데이터에 없습니다: {missing_cols}")
+            
+            # 대분류 분포 출력
+            if "대분류" in self.test_data.columns:
+                print(f"   - 대분류 종류: {self.test_data['대분류'].nunique()}개")
+                print(f"   - 대분류 분포:\n{self.test_data['대분류'].value_counts()}")
+            
+            return self.test_data
+            
+        except FileNotFoundError:
+            print(f"❌ 오류: 테스트 데이터 파일을 찾을 수 없습니다: {test_file_path}")
+            print("   테스트 데이터를 data/ml_test_data.csv에 수동으로 준비해주세요.")
+            raise
+        except Exception as e:
+            print(f"❌ 테스트 데이터 로드 실패: {str(e)}")
+            raise
     
     def run_test(self) -> Dict:
         """ML 알고리즘 성능 테스트"""
@@ -140,13 +126,13 @@ class MLPerformanceTest:
                         results["usage_type_accuracy"][true_label]["correct"] += 1
                         
             except Exception as e:
-                print(f"  ❌ 오류: {str(e)}")
+                print(f"  ❌ 오류 (인덱스 {idx}): {str(e)}")
                 results["execution_times"].append(0)
         
-        results["top1_accuracy"] = (results["top1_correct"] / results["total"]) * 100
-        results["top3_accuracy"] = (results["top3_correct"] / results["total"]) * 100
-        results["top5_accuracy"] = (results["top5_correct"] / results["total"]) * 100
-        results["avg_execution_time"] = np.mean(results["execution_times"]) * 1000
+        results["top1_accuracy"] = (results["top1_correct"] / results["total"]) * 100 if results["total"] > 0 else 0
+        results["top3_accuracy"] = (results["top3_correct"] / results["total"]) * 100 if results["total"] > 0 else 0
+        results["top5_accuracy"] = (results["top5_correct"] / results["total"]) * 100 if results["total"] > 0 else 0
+        results["avg_execution_time"] = np.mean(results["execution_times"]) * 1000 if results["execution_times"] else 0
         
         print(f"   ✅ Top-1 정확도: {results['top1_accuracy']:.2f}%")
         print(f"   ✅ Top-3 정확도: {results['top3_accuracy']:.2f}%")
@@ -203,9 +189,28 @@ def main():
     
     test = MLPerformanceTest()
     
+    # 1. ML 모델 학습
     test.load_and_train()
-    test.generate_test_data()
+    
+    # 2. 테스트 데이터 로드 (수동으로 준비된 데이터)
+    try:
+        test.load_test_data("data/ml_test_data.csv")
+    except Exception as e:
+        print("\n❌ 테스트 데이터 로드 실패")
+        print("테스트 데이터를 data/ml_test_data.csv에 준비해주세요.")
+        print("\n필요한 컬럼:")
+        print("  - 대분류")
+        print("  - 인구[명]")
+        print("  - 교통량")
+        print("  - 숙박업소(관광지수)")
+        print("  - 상권밀집도(비율)")
+        print("  - 공시지가(토지단가)")
+        return
+    
+    # 3. ML 알고리즘 테스트
     test.run_test()
+    
+    # 4. 결과 저장
     test.save_results()
     
     print("\n✅ ML 성능 테스트 완료!")
