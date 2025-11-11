@@ -33,7 +33,15 @@ class GeoService:
             
             # 폐/휴업 주유소 데이터 로드
             self.data["closed_gas_station"] = load_closed_gas_station_data()
-            
+
+            # ✅ (id 자동 부여)
+            for key in self.data:
+                df = self.data[key]
+                if "id" not in df.columns:
+                    df = df.reset_index().rename(columns={"index": "id"})
+                    self.data[key] = df
+                    print(f"🔧 '{key}' 데이터에 id 부여 완료 ({len(df)}개 행)")
+
             print("✅ 지리 정보 서비스 초기화 완료")
         except Exception as e:
             print(f"⚠️ 지리 정보 서비스 초기화 실패: {str(e)}")

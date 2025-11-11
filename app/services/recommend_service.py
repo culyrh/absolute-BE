@@ -194,3 +194,10 @@ class RecommendationService:
             "name": algorithm_obj.name,
             "description": algorithm_obj.description
         }
+
+
+def get_recommendation_service() -> RecommendationService:
+    # 매번 새로 만드는 게 부담되면, 싱글톤처럼 캐싱해도 됨
+    if not hasattr(get_recommendation_service, "_instance"):
+        get_recommendation_service._instance = RecommendationService()
+    return get_recommendation_service._instance
