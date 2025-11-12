@@ -70,7 +70,7 @@ async def get_stations_in_map(
     """
     try:
         # 폐휴업 주유소 데이터에서 좌표로 검색
-        gas_df = service.data.get("closed_gas_station", None)
+        gas_df = service.data.get("gas_station", None)
         
         # 좌표 데이터가 없는 경우 빈 결과 반환
         if gas_df is None or "위도" not in gas_df.columns or "경도" not in gas_df.columns:
@@ -299,41 +299,6 @@ async def generate_station_report(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{id}", response_model=GasStationResponse)
-async def get_station_detail(
-    id: int = Path(..., description="주유소 ID"),
-    service: GeoService = Depends(get_geo_service),
-    
-):
-    """
-    개별 주유소 상세 정보 API
-    
-    - **id**: 주유소 ID (필수)
-    """
-    try:
-        station = service.get_station_by_id(id)
-        
-        df = service.data.get("closed_gas_station")
-        print("컬럼:", df.columns.tolist())
-        print("id 앞부분:", df.head(5))
-        
-        if not station:
-            raise HTTPException(status_code=404, detail=f"ID가 {id}인 주유소를 찾을 수 없습니다.")
-        
-        # 캐싱 헤더 설정 (1일)
-        headers = {"Cache-Control": "public, max-age=86400"}
-        
-        return JSONResponse(
-            content=station,
-            headers=headers
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"주유소 상세 API 오류: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"주유소 상세 조회 중 오류가 발생했습니다: {str(e)}")
-
-
 @router.get("/cases", response_model=Dict[str, Any])
 async def get_station_cases():
     """
@@ -386,3 +351,38 @@ async def get_station_cases():
     except Exception as e:
         print(f"활용 사례 카드 API 오류: {str(e)}")
         raise HTTPException(status_code=500, detail=f"활용 사례 카드 조회 중 오류가 발생했습니다: {str(e)}")
+
+
+@router.get("/{id}", response_model=GasStationResponse)
+async def get_station_detail(
+    id: int = Path(..., description="주유소 ID"),
+    service: GeoService = Depends(get_geo_service),
+    
+):
+    """
+    개별 주유소 상세 정보 API
+    
+    - **id**: 주유소 ID (필수)
+    """
+    try:
+        station = service.get_station_by_id(id)
+        
+        df = service.data.get("gas_station")
+        print("컬럼:", df.columns.tolist())
+        print("id 앞부분:", df.head(5))
+        
+        if not station:
+            raise HTTPException(status_code=404, detail=f"ID가 {id}인 주유소를 찾을 수 없습니다.")
+        
+        # 캐싱 헤더 설정 (1일)
+        headers = {"Cache-Control": "public, max-age=86400"}
+        
+        return JSONResponse(
+            content=station,
+            headers=headers
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"주유소 상세 API 오류: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"주유소 상세 조회 중 오류가 발생했습니다: {str(e)}")

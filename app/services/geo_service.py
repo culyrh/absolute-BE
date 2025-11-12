@@ -8,7 +8,7 @@ from typing import Dict, List, Tuple, Optional, Union, Any
 import re
 
 from app.utils.data_loader import load_all_data
-from app.utils.preprocessing import extract_admin_region, extract_province, normalize_region
+from app.utils.preprocessing import preprocess_gas_station_data, extract_admin_region, extract_province, normalize_region
 
 
 class GeoService:
@@ -21,31 +21,20 @@ class GeoService:
     def initialize_data(self):
         """데이터 초기화 및 로드"""
         print("🚀 지리 정보 서비스 초기화 중...")
-        
-        # 필요한 데이터만 로드
+    
         self.data = {}
-        
+    
         try:
-            from app.utils.data_loader import load_gas_station_data, load_closed_gas_station_data
-            
-            # 주유소 데이터 로드
+            from app.utils.data_loader import load_gas_station_data
+        
             self.data["gas_station"] = load_gas_station_data()
-            
-            # 폐/휴업 주유소 데이터 로드
-            self.data["closed_gas_station"] = load_closed_gas_station_data()
-
-            # ✅ (id 자동 부여)
-            for key in self.data:
-                df = self.data[key]
-                if "id" not in df.columns:
-                    df = df.reset_index().rename(columns={"index": "id"})
-                    self.data[key] = df
-                    print(f"🔧 '{key}' 데이터에 id 부여 완료 ({len(df)}개 행)")
-
+            self.data["gas_station"] = preprocess_gas_station_data(self.data["gas_station"])
+        
+            print(f"🔧 주유소 데이터 로드 완료: {len(self.data['gas_station'])}개 행")
             print("✅ 지리 정보 서비스 초기화 완료")
         except Exception as e:
             print(f"⚠️ 지리 정보 서비스 초기화 실패: {str(e)}")
-    
+
     def search_by_address(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """주소로 주유소 검색"""
         if not query or not self.data or "gas_station" not in self.data:

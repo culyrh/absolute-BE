@@ -85,7 +85,7 @@ async def recommend_usage(
             dummy_result = {
                 "query": f"{lat},{lng}",
                 "timestamp": "2025-10-28T12:00:00Z",
-                "algorithm": algorithm,
+                "algorithm": algorithm_name,
                 "count": 5,
                 "items": [
                     {

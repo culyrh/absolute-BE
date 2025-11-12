@@ -12,10 +12,34 @@ from app.core.config import settings, DATA_DIR
 
 
 def load_gas_station_data() -> pd.DataFrame:
-    """주유소 데이터 로드"""
+    """주유소 데이터 로드 (폐주유소 데이터 사용)"""
     try:
-        file_path = DATA_DIR / settings.GAS_STATION_FILE   # "jeonju_gas_station.csv"
+        file_path = DATA_DIR / settings.GAS_STATION_FILE
         df = pd.read_csv(file_path)
+        
+        # 컬럼 이름 매핑 - 폐주유소 CSV 파일 형식에 맞게 조정
+        column_mapping = {
+            "field1": "년도", 
+            "field2": "일자",
+            "field3": "업종",
+            "field4": "상태",
+            "field5": "상호",
+            "field6": "주소",
+            "_CLEANADDR": "정제주소",
+            "_X": "경도",
+            "_Y": "위도"
+        }
+        
+        # 컬럼 이름 변경
+        df = df.rename(columns=column_mapping)
+        
+        # 주유소 데이터만 필터링
+        df = df[df["업종"] == "주유소"].copy()
+        
+        # ID 부여 (인덱스 기반)
+        df = df.reset_index(drop=True)
+        df["id"] = df.index
+        
         print(f"📊 주유소 데이터 로드 완료: {len(df)}개 행")
         return df
     except Exception as e:
@@ -71,39 +95,6 @@ def load_recommend_result_data() -> pd.DataFrame:
         raise
 
 
-def load_closed_gas_station_data() -> pd.DataFrame:
-    """폐/휴업 주유소 데이터 로드"""
-    try:
-        file_path = DATA_DIR / settings.CLOSED_GAS_STATION_FILE   # "폐주유소좌표변환.csv"
-        df = pd.read_csv(file_path)
-        
-        # 컬럼 이름 매핑 - 새로운 CSV 파일 형식에 맞게 조정
-        column_mapping = {
-            "field1": "년도", 
-            "field2": "일자",
-            "field3": "업종",
-            "field4": "상태",
-            "field5": "상호",
-            "field6": "주소",
-            "_CLEANADDR": "정제주소",
-            "_X": "경도",
-            "_Y": "위도"
-        }
-        
-        # 필요한 컬럼이 있는지 확인하고 이름 변경
-        df = df.rename(columns=column_mapping)
-        
-        # 필터링: 폐업 또는 휴업 상태인 레코드만 선택
-        df = df[df["상태"].isin(["폐업", "휴업"])]
-        
-        print(f"📊 폐/휴업 주유소 데이터 로드 완료: {len(df)}개 행")
-        return df
-    except Exception as e:
-        print(f"❌ 폐/휴업 주유소 데이터 로드 실패: {str(e)}")
-        # 오류 발생 시 빈 DataFrame 반환 - 애플리케이션이 중단되지 않도록 함
-        return pd.DataFrame(columns=["년도", "일자", "업종", "상태", "상호", "주소", "정제주소", "경도", "위도"])
-
-
 def find_column_by_keyword(df: pd.DataFrame, keywords: List[str]) -> Optional[str]:
     """키워드를 포함하는 컬럼명 찾기"""
     for keyword in keywords:
@@ -124,7 +115,6 @@ def load_all_data() -> Dict[str, pd.DataFrame]:
             "business": load_business_data(),
             "centroid": load_centroid_data(),
             "recommend_result": load_recommend_result_data(),
-            "closed_gas_station": load_closed_gas_station_data()
         }
     except Exception as e:
         print(f"⚠️ 일부 데이터 로드 실패: {str(e)}")
@@ -157,8 +147,6 @@ def load_all_data() -> Dict[str, pd.DataFrame]:
         except:
             data["recommend_result"] = pd.DataFrame()
         
-        # 폐/휴업 주유소 데이터는 항상 빈 DataFrame이라도 제공
-        data["closed_gas_station"] = load_closed_gas_station_data()
     
     print("✅ 모든 데이터 로드 완료")
     return data
