@@ -5,7 +5,7 @@ app/comparison/ml_performance_test.py
 사용법:
     python -m app.comparison.ml_performance_test
     
-테스트 데이터는 data/ml_test_data.csv에 수동으로 준비되어 있어야 합니다.
+테스트 데이터는 data/test_data.csv에 수동으로 준비되어 있어야 합니다.
 """
 
 import pandas as pd
@@ -39,7 +39,7 @@ class MLPerformanceTest:
         
         return accuracy, train_time
     
-    def load_test_data(self, test_file_path: str = "data/ml_test_data.csv"):
+    def load_test_data(self, test_file_path: str = "data/test_data.csv"):
         """
         수동으로 준비된 ML 테스트 데이터 로드
         
@@ -47,7 +47,7 @@ class MLPerformanceTest:
             test_file_path: 테스트 데이터 파일 경로
             
         테스트 데이터 형식:
-        - 필수 컬럼: 대분류, 인구[명], 교통량, 숙박업소(관광지수), 상권밀집도(비율), 공시지가(토지단가)
+        - 필수 컬럼: 대분류, 인구[명], 교통량, 숙박업소(관광지수), 상권밀집도(비율)
         - 선택 컬럼: 권역, 주소, 행정구역
         """
         print(f"\n📂 ML 테스트 데이터 로드 중: {test_file_path}")
@@ -72,7 +72,7 @@ class MLPerformanceTest:
             
         except FileNotFoundError:
             print(f"❌ 오류: 테스트 데이터 파일을 찾을 수 없습니다: {test_file_path}")
-            print("   테스트 데이터를 data/ml_test_data.csv에 수동으로 준비해주세요.")
+            print("   테스트 데이터를 data/test_data.csv에 수동으로 준비해주세요.")
             raise
         except Exception as e:
             print(f"❌ 테스트 데이터 로드 실패: {str(e)}")
@@ -194,17 +194,17 @@ def main():
     
     # 2. 테스트 데이터 로드 (수동으로 준비된 데이터)
     try:
-        test.load_test_data("data/ml_test_data.csv")
+        test.load_test_data("data/test_data.csv")
     except Exception as e:
         print("\n❌ 테스트 데이터 로드 실패")
-        print("테스트 데이터를 data/ml_test_data.csv에 준비해주세요.")
+        print("테스트 데이터를 data/test_data.csv에 준비해주세요.")
         print("\n필요한 컬럼:")
         print("  - 대분류")
         print("  - 인구[명]")
         print("  - 교통량")
         print("  - 숙박업소(관광지수)")
         print("  - 상권밀집도(비율)")
-        print("  - 공시지가(토지단가)")
+        #print("  - 공시지가(토지단가)")
         return
     
     # 3. ML 알고리즘 테스트
