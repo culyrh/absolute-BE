@@ -34,6 +34,26 @@ class GeoService:
             print("✅ 지리 정보 서비스 초기화 완료")
         except Exception as e:
             print(f"⚠️ 지리 정보 서비스 초기화 실패: {str(e)}")
+    
+    def search_by_name(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """상호(주유소 이름)로 주유소 검색"""
+        if not query or not self.data or "gas_station" not in self.data:
+            return []
+        
+        gas_df = self.data["gas_station"]
+
+        # '상호' 컬럼이 있는지 확인
+        if "상호" not in gas_df.columns:
+            return []
+        
+        # 검색어가 포함된 상호만 필터링 (대소문자 무시)
+        filtered_df = gas_df[gas_df["상호"].astype(str).str.contains(query, case=False, na=False)]
+        
+        # 상위 limit개만 반환
+        result = filtered_df.head(limit).to_dict('records')
+        
+        return result
+
 
     def search_by_address(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """주소로 주유소 검색"""

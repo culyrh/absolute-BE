@@ -22,32 +22,55 @@ router = APIRouter(
 )
 
 
-@router.get("/region/{code}", response_model=GasStationList)
-async def get_stations_by_region(
-    code: str = Path(..., description="지역 코드"),
-    limit: int = Query(100, ge=1, le=1000, description="반환할 결과 수"),
+@router.get("/region/{code}")
+async def get_geojson_by_region(
+    code: str = Path(..., description="지역 코드 (예: 서울특별시, 전주시 등)"),
+    limit: int = Query(5000, ge=1, le=5000, description="반환할 결과 수"),
     service: GeoService = Depends(get_geo_service),
 ):
     """
-    지역별 주유소 목록 API
-    
-    - **code**: 지역 코드 (필수)
-    - **limit**: 반환할 결과 수 (기본값: 100, 최대: 1000)
+    지역별 주유소 목록 GeoJSON API
     """
     try:
-        # 행정구역으로 검색
+        # 지역 데이터 조회
         result = service.search_by_region(code, limit)
-        
-        # 캐싱 헤더 설정 (1시간)
+        if not result:
+            return JSONResponse(content={"type": "FeatureCollection", "features": []})
+
+        # GeoJSON 형태로 변환
+        features = []
+        for item in result:
+            try:
+                lon = float(item.get("경도"))
+                lat = float(item.get("위도"))
+            except (ValueError, TypeError):
+                continue  # 좌표 없는 항목은 제외
+
+            feature = {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [lon, lat]
+                },
+                "properties": {
+                    k: v for k, v in item.items()
+                    if k not in ["경도", "위도"]
+                }
+            }
+            features.append(feature)
+
+        # GeoJSON 반환
+        geojson = {
+            "type": "FeatureCollection",
+            "features": features
+        }
+
         headers = {"Cache-Control": "public, max-age=3600"}
-        
-        return JSONResponse(
-            content={"count": len(result), "items": result},
-            headers=headers
-        )
+        return JSONResponse(content=geojson, headers=headers)
+
     except Exception as e:
-        print(f"지역별 주유소 목록 API 오류: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"지역별 주유소 목록 조회 중 오류가 발생했습니다: {str(e)}")
+        print(f"지역별 GeoJSON 변환 오류: {e}")
+        raise HTTPException(status_code=500, detail=f"GeoJSON 변환 중 오류 발생: {e}")
 
 
 @router.get("/map", response_model=GasStationList)
@@ -66,7 +89,7 @@ async def get_stations_in_map(
     - **lng1**: 경도 최소값 (필수)
     - **lat2**: 위도 최대값 (필수)
     - **lng2**: 경도 최대값 (필수)
-    - **limit**: 반환할 결과 수 (기본값: 100, 최대: 10000)
+    - **limit**: 반환할 결과 수 (기본값: 10000, 최대: 10000)
     """
     try:
         # 폐휴업 주유소 데이터에서 좌표로 검색
@@ -101,23 +124,51 @@ async def get_stations_in_map(
 
 @router.get("/search", response_model=GasStationList)
 async def search_stations(
-    query: str = Query(..., description="주소 검색어"),
+    query: str = Query(..., description="주유소 이름 검색어"),
     limit: int = Query(100, ge=1, le=1000, description="반환할 결과 수"),
     service: GeoService = Depends(get_geo_service),
 ):
     """
-    주소 기반 검색 API
-    
-    - **query**: 주소 검색어 (필수)
+    주유소명 기반 검색 API
+
+    - **query**: 주유소명 검색어 (예: '현대', 'SK', '목화')
     - **limit**: 반환할 결과 수 (기본값: 100, 최대: 1000)
     """
     try:
-        # 주소로 검색
-        result = service.search_by_address(query, limit)
-        return {"count": len(result), "items": result}
+        # 주유소 이름으로 검색
+        result = service.search_by_name(query, limit)
+        
+        # GeoJSON 형식으로 반환
+        features = []
+        for item in result:
+            try:
+                lon = float(item.get("경도"))
+                lat = float(item.get("위도"))
+            except (ValueError, TypeError):
+                continue
+
+            feature = {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [lon, lat]
+                },
+                "properties": {
+                    k: v for k, v in item.items() if k not in ["경도", "위도"]
+                }
+            }
+            features.append(feature)
+
+        geojson = {
+            "type": "FeatureCollection",
+            "features": features
+        }
+
+        return JSONResponse(content=geojson)
+
     except Exception as e:
-        print(f"주소 기반 검색 API 오류: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"주소 기반 검색 중 오류가 발생했습니다: {str(e)}")
+        print(f"주유소명 기반 검색 API 오류: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"주유소명 기반 검색 중 오류 발생: {str(e)}")
 
 
 @router.get("/{id}/report", response_class=HTMLResponse)
