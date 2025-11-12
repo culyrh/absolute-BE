@@ -56,7 +56,7 @@ async def get_stations_in_map(
     lng1: float = Query(..., description="경도 최소값"),
     lat2: float = Query(..., description="위도 최대값"),
     lng2: float = Query(..., description="경도 최대값"),
-    limit: int = Query(100, ge=1, le=1000, description="반환할 결과 수"),
+    limit: int = Query(10000, ge=1, le=10000, description="반환할 결과 수"),
     service: GeoService = Depends(get_geo_service),
 ):
     """
@@ -66,7 +66,7 @@ async def get_stations_in_map(
     - **lng1**: 경도 최소값 (필수)
     - **lat2**: 위도 최대값 (필수)
     - **lng2**: 경도 최대값 (필수)
-    - **limit**: 반환할 결과 수 (기본값: 100, 최대: 1000)
+    - **limit**: 반환할 결과 수 (기본값: 100, 최대: 10000)
     """
     try:
         # 폐휴업 주유소 데이터에서 좌표로 검색
