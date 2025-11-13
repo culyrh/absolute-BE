@@ -67,11 +67,23 @@ class RecommendationService:
         """센트로이드 데이터 처리"""
         try:
             self.centroids = self.data["centroid"].copy()
+        
+            # 대분류 컬럼을 usage_type으로 변환
+            if "대분류" in self.centroids.columns:
+                self.centroids = self.centroids.rename(columns={"대분류": "usage_type"})
+                print("✅ 센트로이드 컬럼명 변환: 대분류 → usage_type")
+        
             print(f"📊 센트로이드 데이터 처리 완료: {len(self.centroids)}개")
+            if "usage_type" in self.centroids.columns:
+                print(f"📊 용도 유형: {self.centroids['usage_type'].unique().tolist()}")
+            
         except Exception as e:
             print(f"⚠️ 센트로이드 데이터 로드 실패: {str(e)}")
+            import traceback
+            traceback.print_exc()
             # 빈 센트로이드 생성
             self.centroids = pd.DataFrame(columns=["usage_type", "region"] + self.norm_cols)
+    
     
     def _initialize_algorithms(self):
         """모든 알고리즘 객체 초기화"""

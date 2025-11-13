@@ -1,84 +1,39 @@
-"""
-추천 알고리즘 기본 인터페이스
-"""
-
-from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+import numpy as np
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
 
-class BaseRecommendationAlgorithm(ABC):
+class BaseAlgorithm:
     """추천 알고리즘 기본 클래스"""
-    
-    def __init__(self, centroids: pd.DataFrame, norm_cols: List[str]):
-        """
-        Args:
-            centroids: 센트로이드 데이터프레임
-            norm_cols: 정규화된 특징 컬럼 리스트
-        """
+
+    def __init__(self, centroids: pd.DataFrame, norm_cols: list, train_data: pd.DataFrame = None):
         self.centroids = centroids
         self.norm_cols = norm_cols
-    
-    @abstractmethod
-    def recommend(self, df: pd.DataFrame, top_k: int = 10) -> List[Dict[str, Any]]:
-        """
-        추천 결과 생성
-        
-        Args:
-            df: 필터링된 주유소 데이터프레임
-            top_k: 반환할 결과 수
-            
-        Returns:
-            추천 결과 리스트
-        """
-        pass
-    
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """알고리즘 이름"""
-        pass
-    
-    @property
-    @abstractmethod
-    def description(self) -> str:
-        """알고리즘 설명"""
-        pass
-    
-    def _format_result(self, 
-                       address_row: pd.Series, 
-                       usage_type: str, 
-                       score: float, 
-                       rank: int,
-                       **kwargs) -> Dict[str, Any]:
-        """
-        결과를 표준 형식으로 포맷
-        
-        Args:
-            address_row: 주소 데이터 행
-            usage_type: 용도 유형
-            score: 점수
-            rank: 순위
-            **kwargs: 추가 정보
-            
-        Returns:
-            포맷된 결과 딕셔너리
-        """
-        return {
-            "address": address_row.get("주소", ""),
-            "admin_region": address_row.get("행정구역", ""),
-            "usage_type": usage_type,
-            "score": float(score),
-            "rank": rank,
-            "population": float(address_row.get("인구[명]", 0)),
-            "business_density": float(address_row.get("인구천명당사업체수", 0)),
-            "population_norm": float(address_row.get("인구[명]_norm", 0)),
-            "business_density_norm": float(address_row.get("인구천명당사업체수_norm", 0)),
-            "traffic_norm": float(address_row.get("교통량_norm", 0) if "교통량_norm" in address_row else 0),
-            "tourism_norm": float(address_row.get("숙박업소(관광지수)_norm", 0) if "숙박업소(관광지수)_norm" in address_row else 0),
-            "land_price_norm": float(address_row.get("공시지가(토지단가)_norm", 0) if "공시지가(토지단가)_norm" in address_row else 0),
-            "station_name": address_row.get("상호명", ""),
-            "station_status": address_row.get("상태", ""),
-            "note": address_row.get("비고", ""),
-            **kwargs  # 알고리즘별 추가 정보
-        }
+        self.train_data = train_data
+
+    def _normalize_if_missing(self, df: pd.DataFrame):
+        """_norm 컬럼이 누락된 경우 자동 정규화"""
+        missing = [c for c in self.norm_cols if c not in df.columns]
+        if missing:
+            scaler = StandardScaler()
+            normed = scaler.fit_transform(df[[c.replace("_norm", "") for c in self.norm_cols if c.replace("_norm", "") in df.columns]])
+            for i, col in enumerate(self.norm_cols):
+                if col.replace("_norm", "") in df.columns:
+                    df[col] = normed[:, i]
+        return df
+
+    def _filter_by_region(self, df: pd.DataFrame, region_value: str):
+        """권역 필터링 (없으면 전체 사용)"""
+        if "권역" in df.columns:
+            region_df = df[df["권역"] == region_value]
+            if len(region_df) > 0:
+                return region_df
+        if "관할주소" in df.columns:
+            region_df = df[df["관할주소"] == region_value]
+            if len(region_df) > 0:
+                return region_df
+        return df  # fallback
+
+    def _extract_usage_name(self, row: pd.Series):
+        """usage_type 또는 대분류 이름 추출"""
+        return row.get("usage_type", row.get("대분류", ""))
