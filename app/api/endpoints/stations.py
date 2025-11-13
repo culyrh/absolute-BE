@@ -107,8 +107,16 @@ async def get_stations_in_map(
             (gas_df["경도"] <= lng2)
         ]
         
+        filtered_df = filtered_df[
+            filtered_df["위도"].apply(lambda x: isinstance(x, (int, float))) &
+            filtered_df["경도"].apply(lambda x: isinstance(x, (int, float)))
+        ]
+
+        # NaN → None 변환
+        clean_df = filtered_df.where(filtered_df.notnull(), None)
+
         # 결과 형식화
-        result = filtered_df.head(limit).to_dict("records")
+        result = clean_df.head(limit).to_dict("records")
         
         # 캐싱 헤더 설정 (5분)
         headers = {"Cache-Control": "public, max-age=300"}
