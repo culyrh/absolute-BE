@@ -3,6 +3,8 @@
 import geopandas as gpd
 import os
 from app.services.geoai_config import GeoAIConfig
+from functools import lru_cache
+
 
 class ParcelService:
     def __init__(self):
@@ -27,3 +29,8 @@ class ParcelService:
 
         self.cache[sidocode] = gdf
         return gdf
+
+@lru_cache()
+def get_parcel_service() -> ParcelService:
+    """FastAPI 의존성 주입용 팩토리 함수"""
+    return ParcelService()
