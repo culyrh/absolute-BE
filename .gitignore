@@ -38,3 +38,5 @@ htmlcov/
 # test
 .pytest_cache/
 tests/__pycache__/
+
+/data/parcels
