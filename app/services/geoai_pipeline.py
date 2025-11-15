@@ -5,12 +5,12 @@ from app.services.geoai_model import GeoAIClassifier
 
 class GeoAIPipeline:
     def __init__(self):
-        self.engineer = GeoAIFeatureEngineer()
+        self.engineer = GeoAIFeatureEngineer(debug=True, debug_limit=5)
         self.model = GeoAIClassifier()
 
     def run(self):
-        df = self.engineer.run()
-        self.model.train(df)
+        df = self.engineer.run()    # 피처 엔지니어링 실행
+        self.model.train(df)    # 학습 실행
 
 
 if __name__ == "__main__":
