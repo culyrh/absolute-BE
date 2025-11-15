@@ -2,16 +2,19 @@
 주유소 정보 관련 API 엔드포인트
 """
 
+from collections import Counter
 from html import escape
+from typing import Optional, List, Dict, Any
+
 import folium
 from fastapi import APIRouter, Depends, Query, HTTPException, Path
-from typing import Optional, List, Dict, Any
 from fastapi.responses import JSONResponse
 from fastapi.responses import HTMLResponse
+from shapely.geometry import Point
 
 from app.api.dependencies import get_geo_service, get_report_service
-from app.services.geo_service import GeoService
 from app.schemas.gas_station import GasStationList, GasStationResponse
+from app.services.geo_service import GeoService
 from app.services.parcel_service import get_parcel_service
 from app.services.recommend_service import RecommendationService, get_recommendation_service
 from app.services.report_service import LLMReportService
@@ -22,6 +25,97 @@ router = APIRouter(
     tags=["gas_stations"],
     responses={404: {"description": "Not found"}},
 )
+
+
+METERS_PER_DEGREE = 111_000
+
+
+def _classify_parcel_area(area_m2: float) -> str:
+    if area_m2 < 300:
+        return "소형"
+    if area_m2 < 1000:
+        return "중형"
+    if area_m2 < 3000:
+        return "대형"
+    return "초대형"
+
+
+def _extract_land_use(row: Dict[str, Any]) -> Optional[str]:
+    candidate_keys = [
+        "JIMOK",
+        "JIGU",
+        "USEDSGN",
+        "USE",
+        "LAND_USE",
+        "ZONING",
+        "지목",
+        "용도지역",
+    ]
+    for key in candidate_keys:
+        value = row.get(key)
+        if value:
+            return str(value)
+    return None
+
+
+def _summarise_nearby_parcels(gdf, lat: float, lng: float) -> Optional[Dict[str, Any]]:
+    if gdf is None or getattr(gdf, "empty", True):
+        return None
+
+    bucket_counter: Counter[str] = Counter()
+    total_area = 0.0
+    land_use_counter: Counter[str] = Counter()
+    closest_info: Optional[Dict[str, Any]] = None
+    station_point = Point(lng, lat)
+
+    for _, row in gdf.iterrows():
+        geometry = row.get("geometry")
+        if geometry is None or geometry.is_empty:
+            continue
+
+        try:
+            area_m2 = abs(float(geometry.area)) * (METERS_PER_DEGREE ** 2)
+        except Exception:
+            area_m2 = 0.0
+
+        if area_m2 > 0:
+            bucket_counter[_classify_parcel_area(area_m2)] += 1
+            total_area += area_m2
+
+        land_use = _extract_land_use(row)
+        if land_use:
+            land_use_counter[land_use] += 1
+
+        try:
+            distance_m = geometry.centroid.distance(station_point) * METERS_PER_DEGREE
+        except Exception:
+            distance_m = None
+
+        if distance_m is not None:
+            if not closest_info or distance_m < closest_info.get("distance_m", float("inf")):
+                closest_info = {
+                    "distance_m": float(distance_m),
+                    "label": row.get("JIBUN") or row.get("PNU") or row.get("LOTNO") or row.get("BUNJI"),
+                }
+
+    total_count = sum(bucket_counter.values())
+    if total_count == 0:
+        return None
+
+    average_area = total_area / total_count if total_count else 0
+    top_land_uses = [
+        {"use": use, "count": count}
+        for use, count in land_use_counter.most_common(3)
+    ]
+
+    return {
+        "total_count": total_count,
+        "total_area": total_area,
+        "average_area": average_area,
+        "bucket_counts": dict(bucket_counter),
+        "top_land_uses": top_land_uses,
+        "closest": closest_info,
+    }
 
 
 @router.get("/region/{code}")
@@ -213,19 +307,27 @@ async def generate_station_report(
             print(f"추천 서비스 오류: {rec_error}")
             rec_items = []
 
-        llm_report = await report_service.generate_report(station, rec_items)
-        
+        parcel_summary = None
+
         # 3. 지적도 + 지도 생성
         m = folium.Map(location=[lat, lng], zoom_start=17, tiles='OpenStreetMap')
-        
+
         # 3-1. 지적도 오버레이 (있을 때만)
         nearby_parcels = None
         try:
             parcel_service = get_parcel_service()
             nearby_parcels = parcel_service.get_nearby_parcels(lat, lng, radius=0.003)
+            parcel_summary = _summarise_nearby_parcels(nearby_parcels, lat, lng)
         except Exception as parcel_error:
             print(f"지적도 서비스 오류: {parcel_error}")
             nearby_parcels = None
+
+        llm_report = await report_service.generate_report(
+            station,
+            rec_items,
+            parcel_summary=parcel_summary,
+            station_id=id,
+        )
 
         if nearby_parcels is not None and not nearby_parcels.empty:
             # 필지별로 그리기 (최대 200개)
@@ -284,9 +386,9 @@ async def generate_station_report(
         
         # 범례 추가
         legend_html = '''
-        <div style="position: fixed; bottom: 50px; left: 50px; 
-                    background: white; padding: 15px; border: 2px solid gray; 
-                    border-radius: 5px; z-index: 9999;">
+        <div style="position: absolute; bottom: 20px; left: 20px;
+                    background: rgba(255, 255, 255, 0.95); padding: 12px 16px; border: 1px solid #ccc;
+                    border-radius: 5px; z-index: 500; font-size: 13px; line-height: 1.4;">
             <p style="margin: 0 0 10px 0; font-weight: bold;">필지 크기</p>
             <p style="margin: 5px 0;">
                 <span style="background: #3498db; padding: 3px 10px;">　</span> 소형 (&lt;300㎡)
@@ -379,8 +481,10 @@ async def generate_station_report(
                              border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
                 .header {{ background: linear-gradient(135deg, #667eea, #764ba2);
                           color: white; padding: 30px; }}
-                .section {{ padding: 25px; border-bottom: 1px solid #eee; }}
-                .map-container {{ height: 500px; }}
+                .section {{ padding: 25px; border-bottom: 1px solid #eee; position: relative; }}
+                .map-container {{ height: 500px; position: relative; margin-bottom: 16px; border-radius: 8px; overflow: hidden; }}
+                .map-container iframe {{ border: none; border-radius: 8px; }}
+                .map-note {{ margin-top: 6px; color: #7f8c8d; font-size: 13px; }}
                 .section h3 {{ font-size: 18px; margin-top: 0; }}
                 .section ul, .section ol {{ color: #34495e; }}
                 h1 {{ margin: 0 0 10px 0; }}
@@ -397,7 +501,7 @@ async def generate_station_report(
                 <div class="section">
                     <h2>🗺️ 위치 및 필지 지도</h2>
                     <div class="map-container">{map_html}</div>
-                    <p style="margin-top: 10px; color: #7f8c8d; font-size: 13px;">
+                    <p class="map-note">
                         ※ 색상은 필지 크기를 나타냅니다.
                         빨간 원은 반경 300m 범위입니다.
                     </p>
