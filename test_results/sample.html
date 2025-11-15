@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <title>남상주농협주유소 입지 분석 보고서</title>
+  <title>남부안농민회주유소 입지 분석 보고서</title>
   <style>
     body {
       font-family: Arial;
@@ -30,10 +30,26 @@
     .section {
       padding: 25px;
       border-bottom: 1px solid #eee;
+      position: relative;
     }
 
     .map-container {
       height: 500px;
+      position: relative;
+      margin-bottom: 16px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .map-container iframe {
+      border: none;
+      border-radius: 8px;
+    }
+
+    .map-note {
+      margin-top: 6px;
+      color: #7f8c8d;
+      font-size: 13px;
     }
 
     .section h3 {
@@ -60,8 +76,8 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>📍 남상주농협주유소</h1>
-      <p>경북 상주시 청리면 남상주로 1044</p>
+      <h1>📍 남부안농민회주유소</h1>
+      <p>전북 부안군 보안면 청자로 1518</p>
     </div>
 
     <div class="section">
@@ -88,7 +104,7 @@
             &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no&quot; /&gt;
             &lt;style&gt;
-                #map_74022b72f4dfdd83c7047ee4551e4c33 {
+                #map_c0a767d4d09cbe39b4f87c7f8121e5b6 {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -125,9 +141,9 @@
 &lt;body&gt;
     
     
-        &lt;div style=&quot;position: fixed; bottom: 50px; left: 50px; 
-                    background: white; padding: 15px; border: 2px solid gray; 
-                    border-radius: 5px; z-index: 9999;&quot;&gt;
+        &lt;div style=&quot;position: absolute; bottom: 20px; left: 20px;
+                    background: rgba(255, 255, 255, 0.95); padding: 12px 16px; border: 1px solid #ccc;
+                    border-radius: 5px; z-index: 500; font-size: 13px; line-height: 1.4;&quot;&gt;
             &lt;p style=&quot;margin: 0 0 10px 0; font-weight: bold;&quot;&gt;필지 크기&lt;/p&gt;
             &lt;p style=&quot;margin: 5px 0;&quot;&gt;
                 &lt;span style=&quot;background: #3498db; padding: 3px 10px;&quot;&gt;　&lt;/span&gt; 소형 (&amp;lt;300㎡)
@@ -144,16 +160,16 @@
         &lt;/div&gt;
         
     
-            &lt;div class=&quot;folium-map&quot; id=&quot;map_74022b72f4dfdd83c7047ee4551e4c33&quot; &gt;&lt;/div&gt;
+            &lt;div class=&quot;folium-map&quot; id=&quot;map_c0a767d4d09cbe39b4f87c7f8121e5b6&quot; &gt;&lt;/div&gt;
         
 &lt;/body&gt;
 &lt;script&gt;
     
     
-            var map_74022b72f4dfdd83c7047ee4551e4c33 = L.map(
-                &quot;map_74022b72f4dfdd83c7047ee4551e4c33&quot;,
+            var map_c0a767d4d09cbe39b4f87c7f8121e5b6 = L.map(
+                &quot;map_c0a767d4d09cbe39b4f87c7f8121e5b6&quot;,
                 {
-                    center: [36.331498451420565, 128.12546970534697],
+                    center: [35.61053069786346, 126.65454134650588],
                     crs: L.CRS.EPSG3857,
                     ...{
   &quot;zoom&quot;: 17,
@@ -168,7 +184,7 @@
 
         
     
-            var tile_layer_9dd1518827f7923a944530674b8a2eee = L.tileLayer(
+            var tile_layer_7d425789f77253bc7f0098899b4ad961 = L.tileLayer(
                 &quot;https://tile.openstreetmap.org/{z}/{x}/{y}.png&quot;,
                 {
   &quot;minZoom&quot;: 0,
@@ -185,17 +201,17 @@
             );
         
     
-            tile_layer_9dd1518827f7923a944530674b8a2eee.addTo(map_74022b72f4dfdd83c7047ee4551e4c33);
+            tile_layer_7d425789f77253bc7f0098899b4ad961.addTo(map_c0a767d4d09cbe39b4f87c7f8121e5b6);
         
     
-            var marker_a2479ee4fa04f90a32e637b2ec188c2e = L.marker(
-                [36.331498451420565, 128.12546970534697],
+            var marker_1382e61f2739f065c3a3c1ec53210868 = L.marker(
+                [35.61053069786346, 126.65454134650588],
                 {
 }
-            ).addTo(map_74022b72f4dfdd83c7047ee4551e4c33);
+            ).addTo(map_c0a767d4d09cbe39b4f87c7f8121e5b6);
         
     
-            var icon_3864b286830765410004013508ca7a94 = L.AwesomeMarkers.icon(
+            var icon_d18f8aeb9ecf16ce98dddcf781b53361 = L.AwesomeMarkers.icon(
                 {
   &quot;markerColor&quot;: &quot;red&quot;,
   &quot;iconColor&quot;: &quot;white&quot;,
@@ -206,27 +222,27 @@
             );
         
     
-        var popup_3ebd6c0cecbd412c2bbf780d4d29a74e = L.popup({
+        var popup_9aac64bad3a7b1fee5027172f1d16179 = L.popup({
   &quot;maxWidth&quot;: 320,
   &quot;minWidth&quot;: 220,
 });
 
         
             
-                var html_53a86d3273e53860ff654b14467e0d1f = $(`&lt;div id=&quot;html_53a86d3273e53860ff654b14467e0d1f&quot; style=&quot;width: 100.0%; height: 100.0%;&quot;&gt;         &lt;div style=&#x27;white-space: normal; width: 260px; line-height: 1.4;&#x27;&gt;             &lt;div style=&#x27;font-weight: 600; margin-bottom: 4px;&#x27;&gt;남상주농협주유소&lt;/div&gt;             &lt;div&gt;경북 상주시 청리면 남상주로 1044&lt;/div&gt;         &lt;/div&gt;         &lt;/div&gt;`)[0];
-                popup_3ebd6c0cecbd412c2bbf780d4d29a74e.setContent(html_53a86d3273e53860ff654b14467e0d1f);
+                var html_88bdf4d53a74649cfad53aa022943639 = $(`&lt;div id=&quot;html_88bdf4d53a74649cfad53aa022943639&quot; style=&quot;width: 100.0%; height: 100.0%;&quot;&gt;         &lt;div style=&#x27;white-space: normal; width: 260px; line-height: 1.4;&#x27;&gt;             &lt;div style=&#x27;font-weight: 600; margin-bottom: 4px;&#x27;&gt;남부안농민회주유소&lt;/div&gt;             &lt;div&gt;전북 부안군 보안면 청자로 1518&lt;/div&gt;         &lt;/div&gt;         &lt;/div&gt;`)[0];
+                popup_9aac64bad3a7b1fee5027172f1d16179.setContent(html_88bdf4d53a74649cfad53aa022943639);
             
         
 
-        marker_a2479ee4fa04f90a32e637b2ec188c2e.bindPopup(popup_3ebd6c0cecbd412c2bbf780d4d29a74e)
+        marker_1382e61f2739f065c3a3c1ec53210868.bindPopup(popup_9aac64bad3a7b1fee5027172f1d16179)
         ;
 
         
     
     
-            marker_a2479ee4fa04f90a32e637b2ec188c2e.bindTooltip(
+            marker_1382e61f2739f065c3a3c1ec53210868.bindTooltip(
                 `&lt;div&gt;
-                     남상주농협주유소
+                     남부안농민회주유소
                  &lt;/div&gt;`,
                 {
   &quot;sticky&quot;: true,
@@ -234,27 +250,27 @@
             );
         
     
-                marker_a2479ee4fa04f90a32e637b2ec188c2e.setIcon(icon_3864b286830765410004013508ca7a94);
+                marker_1382e61f2739f065c3a3c1ec53210868.setIcon(icon_d18f8aeb9ecf16ce98dddcf781b53361);
             
     
-            var circle_888a10de2d3136a7309f6e37b3674036 = L.circle(
-                [36.331498451420565, 128.12546970534697],
+            var circle_82dfa99ee378ec1aeb43540316b3c512 = L.circle(
+                [35.61053069786346, 126.65454134650588],
                 {&quot;bubblingMouseEvents&quot;: true, &quot;color&quot;: &quot;red&quot;, &quot;dashArray&quot;: null, &quot;dashOffset&quot;: null, &quot;fill&quot;: true, &quot;fillColor&quot;: &quot;red&quot;, &quot;fillOpacity&quot;: 0.1, &quot;fillRule&quot;: &quot;evenodd&quot;, &quot;lineCap&quot;: &quot;round&quot;, &quot;lineJoin&quot;: &quot;round&quot;, &quot;opacity&quot;: 1.0, &quot;radius&quot;: 300, &quot;stroke&quot;: true, &quot;weight&quot;: 3}
-            ).addTo(map_74022b72f4dfdd83c7047ee4551e4c33);
+            ).addTo(map_c0a767d4d09cbe39b4f87c7f8121e5b6);
         
     
-        var popup_aaa666986cc3a3ad1a84cc11dc36241e = L.popup({
+        var popup_e3e3d0ced99afe287fb3bdbd0c47865b = L.popup({
   &quot;maxWidth&quot;: &quot;100%&quot;,
 });
 
         
             
-                var html_ebf6b9a274b8341696ebe48a26deed7a = $(`&lt;div id=&quot;html_ebf6b9a274b8341696ebe48a26deed7a&quot; style=&quot;width: 100.0%; height: 100.0%;&quot;&gt;반경 300m&lt;/div&gt;`)[0];
-                popup_aaa666986cc3a3ad1a84cc11dc36241e.setContent(html_ebf6b9a274b8341696ebe48a26deed7a);
+                var html_774efb655f84bcc7253accf327292565 = $(`&lt;div id=&quot;html_774efb655f84bcc7253accf327292565&quot; style=&quot;width: 100.0%; height: 100.0%;&quot;&gt;반경 300m&lt;/div&gt;`)[0];
+                popup_e3e3d0ced99afe287fb3bdbd0c47865b.setContent(html_774efb655f84bcc7253accf327292565);
             
         
 
-        circle_888a10de2d3136a7309f6e37b3674036.bindPopup(popup_aaa666986cc3a3ad1a84cc11dc36241e)
+        circle_82dfa99ee378ec1aeb43540316b3c512.bindPopup(popup_e3e3d0ced99afe287fb3bdbd0c47865b)
         ;
 
         
@@ -264,7 +280,7 @@
               webkitallowfullscreen mozallowfullscreen></iframe></div>
         </div>
       </div>
-      <p style="margin-top: 10px; color: #7f8c8d; font-size: 13px;">
+      <p class="map-note">
         ※ 색상은 필지 크기를 나타냅니다.
         빨간 원은 반경 300m 범위입니다.
       </p>
@@ -272,7 +288,7 @@
 
     <div class="section">
       <h2>🤖 LLM 기반 분석 요약</h2>
-      <p style="line-height: 1.6;">남상주농협주유소(경북 상주시 청리면 남상주로 1044) 부지에 대한 기초 입지 진단입니다. 주요 용도지역은 '정보 없음'로 파악되며 주변 토지이용과의
+      <p style="line-height: 1.6;">남부안농민회주유소(전북 부안군 보안면 청자로 1518) 부지에 대한 기초 입지 진단입니다. 주요 용도지역은 '정보 없음'로 파악되며 주변 토지이용과의
         연계를 고려해야 합니다.</p>
       <div>
         <h3 style="margin-bottom: 8px; color: #2c3e50;">핵심 인사이트</h3>

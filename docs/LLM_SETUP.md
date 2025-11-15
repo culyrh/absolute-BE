@@ -1,22 +1,24 @@
 # LLM 보고서 연동 가이드
 
+### - 보고서 내용은 추후 수정할 예정입니다.
+
 주유소 입지 보고서 생성 엔드포인트(`/api/stations/{id}/report`)는 LLM에 요청을 보내 분석 요약을 작성합니다. 아래 환경변수를 설정하면 실제 모델에 연결할 수 있습니다.
 
 ## 필수 환경 변수
 
-| 변수 | 설명 |
-| --- | --- |
+| 변수          | 설명                                                                   |
+| ------------- | ---------------------------------------------------------------------- |
 | `LLM_API_KEY` | OpenAI 또는 호환 API의 비밀 키. 미설정 시 기본 분석 문구로 폴백합니다. |
 
 ## 선택 환경 변수
 
-| 변수 | 설명 |
-| --- | --- |
-| `LLM_API_URL` | Chat Completions 엔드포인트 URL. 기본값은 `https://api.openai.com/v1/chat/completions`. |
-| `LLM_MODEL` | 사용할 모델 ID. 기본값은 `gpt-4o-mini`. |
-| `LLM_TIMEOUT` | 요청 타임아웃(초). 기본값은 `30`. |
-| `LLM_TEMPERATURE` | 생성 온도. 기본값은 `0.3`. |
-| `LLM_FORCE_JSON` | `false`로 지정하면 JSON 강제 옵션을 비활성화합니다. 기본은 강제 JSON. |
+| 변수              | 설명                                                                                    |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| `LLM_API_URL`     | Chat Completions 엔드포인트 URL. 기본값은 `https://api.openai.com/v1/chat/completions`. |
+| `LLM_MODEL`       | 사용할 모델 ID. 기본값은 `gpt-4o-mini`.                                                 |
+| `LLM_TIMEOUT`     | 요청 타임아웃(초). 기본값은 `30`.                                                       |
+| `LLM_TEMPERATURE` | 생성 온도. 기본값은 `0.3`.                                                              |
+| `LLM_FORCE_JSON`  | `false`로 지정하면 JSON 강제 옵션을 비활성화합니다. 기본은 강제 JSON.                   |
 
 ## 주유소별 라우팅
 
