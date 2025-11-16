@@ -27,11 +27,18 @@ class GeoService:
         try:
             from app.utils.data_loader import load_gas_station_data
         
-            self.data["gas_station"] = load_gas_station_data()
+            self.data["gas_station"] = load_gas_station_data()  # idx가 부여된 station 데이터
             self.data["gas_station"] = preprocess_gas_station_data(self.data["gas_station"])
         
             print(f"🔧 주유소 데이터 로드 완료: {len(self.data['gas_station'])}개 행")
             print("✅ 지리 정보 서비스 초기화 완료")
+            
+            gas_df = self.data["gas_station"]
+            print("🔥 gas_station 컬럼:", gas_df.columns.tolist())
+            print(gas_df[["위도","경도"]].head())
+            print(gas_df[["위도","경도"]].dtypes)
+            print("🔥 gas_station 총 개수:", len(gas_df))
+
         except Exception as e:
             print(f"⚠️ 지리 정보 서비스 초기화 실패: {str(e)}")
     

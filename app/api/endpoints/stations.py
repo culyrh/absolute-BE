@@ -189,6 +189,9 @@ async def get_stations_in_map(
     """
     try:
         # 폐휴업 주유소 데이터에서 좌표로 검색
+
+        # preprocess_gas_station_data의 processed_df 반환 
+        # -> (행정구역, 권역) 컬럼 추가 / idx가 부여된 station 데이터
         gas_df = service.data.get("gas_station", None)
         
         # 좌표 데이터가 없는 경우 빈 결과 반환

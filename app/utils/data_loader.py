@@ -17,7 +17,7 @@ def load_gas_station_data() -> pd.DataFrame:
         file_path = DATA_DIR / settings.GAS_STATION_FILE
         df = pd.read_csv(file_path)
         
-        # 컬럼 이름 매핑 - 폐주유소 CSV 파일 형식에 맞게 조정
+        # 컬럼 이름 매핑 - station.csv
         column_mapping = {
             "field1": "년도", 
             "field2": "일자",
@@ -25,11 +25,21 @@ def load_gas_station_data() -> pd.DataFrame:
             "field4": "상태",
             "field5": "상호",
             "field6": "주소",
+
+            "_GC_TYPE": "지번종류",
             "_CLEANADDR": "정제주소",
+            "_PNU": "PNU",
+
             "_X": "경도",
-            "_Y": "위도"
+            "_Y": "위도",
+
+            "숙박업소(관광지수)": "관광지수",
+            "인구[명]": "인구",
+            "상권밀집도(비율)": "상권밀집도",
+            "교통량(AADT)": "교통량",
+            "adm_cd": "행정동코드"
         }
-        
+
         # 컬럼 이름 변경
         df = df.rename(columns=column_mapping)
         

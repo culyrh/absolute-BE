@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import List, Optional
 
 
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+DATA_DIR = BASE_DIR / "data"
+
 class Settings(BaseSettings):
     """애플리케이션 설정 클래스"""
     
@@ -16,14 +19,13 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api"
     
     # 데이터 경로
-    DATA_DIR: str = "data"
-    GAS_STATION_FILE: str = "폐주유소좌표변환.csv"
-    POPULATION_FILE: str = "전국인구수_행정동별.csv"
-    BUSINESS_FILE: str = "전국1000명당사업체수_행정동별.csv"
-    CENTER_FILE: str = "대분류_센터로이드.csv"
-    RECOMMEND_RESULT_FILE: str = "추천결과_행단위.csv"
+    GAS_STATION_FILE: str = str(DATA_DIR / "station.csv")
+    POPULATION_FILE: str = str(DATA_DIR / "전국인구수_행정동별.csv")
+    BUSINESS_FILE: str = str(DATA_DIR / "전국1000명당사업체수_행정동별.csv")
+    CENTER_FILE: str = str(DATA_DIR / "대분류_센터로이드.csv")
+    RECOMMEND_RESULT_FILE: str = str(DATA_DIR / "추천결과_행단위.csv")
     # 데이터 통합 파일 경로 업데이트
-    INTEGRATED_DATA_FILE: str = "train.csv"
+    INTEGRATED_DATA_FILE: str = str(DATA_DIR / "train.csv")
     
     # CORS 설정
     CORS_ORIGINS: List[str] = ["*"]
@@ -43,7 +45,3 @@ def get_settings() -> Settings:
 
 # 설정 인스턴스 생성
 settings = get_settings()
-
-# 프로젝트 기본 경로
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-DATA_DIR = BASE_DIR / settings.DATA_DIR
