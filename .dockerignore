@@ -1,4 +1,4 @@
-parcels/
+data/parcels/
 *.shp
 *.dbf
 *.prj
