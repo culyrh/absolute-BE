@@ -7,6 +7,7 @@ from html import escape
 from typing import Optional, List, Dict, Any
 
 import folium
+import math
 from fastapi import APIRouter, Depends, Query, HTTPException, Path
 from fastapi.responses import JSONResponse
 from fastapi.responses import HTMLResponse
@@ -216,6 +217,21 @@ async def get_stations_in_map(
 
         # 결과 형식화
         result = clean_df.head(limit).to_dict("records")
+
+        # JSON 직렬화 오류 해결 / 모든 속성의 결측치 제거
+        def sanitize_value(v):
+            if v is None:
+                return None
+            # NaN 또는 Infinite → None
+            if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                return None
+            return v
+
+        # 모든 레코드에 대해 NaN/inf 정리
+        result = [
+            {k: sanitize_value(v) for k, v in item.items()}
+            for item in result
+        ]            
         
         # 캐싱 헤더 설정 (5분)
         headers = {"Cache-Control": "public, max-age=300"}
