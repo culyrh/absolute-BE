@@ -19,10 +19,15 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_PRIVATE_KEY }}
           script: |
-            cd absolute-be
+            cd /home/ubuntu/absolute-BE
+
             git pull
-            docker build -t fastapi-app .
+
             docker stop fastapi || true
             docker rm fastapi || true
+
+            docker build -t fastapi-app .
+
             docker run -d -p 8000:8000 --name fastapi fastapi-app
+
             docker image prune -f
