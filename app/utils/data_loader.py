@@ -14,7 +14,7 @@ from app.core.config import settings, DATA_DIR
 def load_gas_station_data() -> pd.DataFrame:
     """주유소 데이터 로드 (폐주유소 데이터 사용)"""
     try:
-        file_path = DATA_DIR / settings.GAS_STATION_FILE
+        file_path = settings.GAS_STATION_FILE
         df = pd.read_csv(file_path)
         
         # 컬럼 이름 매핑 - station.csv
