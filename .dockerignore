@@ -1,0 +1,7 @@
+data/
+parcels/
+*.shp
+*.dbf
+*.prj
+*.shx
+*.gpkg

@@ -1,0 +1,11 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    container_name: fastapi_dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app         # 🔥 코드 수정 즉시 반영됨
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
