@@ -145,7 +145,7 @@ class GeoAIFeatureEngineer:
         for idx, row in tqdm(train.iterrows(),      # tqdm으로 진행상황 표시
                              total=len(train),
                             desc="GeoAI Feature Engineering"):
-            sidocode = extract_sidocode(row["adm_cd"])      # 시도코드 추출 (32123456 -> 32)
+            sidocode = extract_sidocode(row["adm_cd2"])      # 시도코드 추출 (3212345600 -> 32)
             parcel_gdf = self.parcels.load_parcels(sidocode)
 
             pt = Point(row["경도"], row["위도"])

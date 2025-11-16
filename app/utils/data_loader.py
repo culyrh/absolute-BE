@@ -37,7 +37,7 @@ def load_gas_station_data() -> pd.DataFrame:
             "인구[명]": "인구",
             "상권밀집도(비율)": "상권밀집도",
             "교통량(AADT)": "교통량",
-            "adm_cd": "행정동코드"
+            "adm_cd2": "법정동코드"
         }
 
         # 컬럼 이름 변경
