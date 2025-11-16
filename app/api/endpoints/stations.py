@@ -119,7 +119,7 @@ def _summarise_nearby_parcels(gdf, lat: float, lng: float) -> Optional[Dict[str,
     }
 
 
-@router.get("/region/{code}")
+@router.get("/region/{code:path}")
 async def get_geojson_by_region(
     code: str = Path(..., description="지역 코드 (예: 서울특별시, 전주시 등)"),
     limit: int = Query(5000, ge=1, le=5000, description="반환할 결과 수"),
@@ -130,7 +130,7 @@ async def get_geojson_by_region(
     """
     try:
         # 지역 데이터 조회
-        result = service.search_by_region(code, limit)
+        result = service.search_by_address(code, limit)
         if not result:
             return JSONResponse(content={"type": "FeatureCollection", "features": []})
 
@@ -186,7 +186,7 @@ async def get_stations_in_map(
     - **lng1**: 경도 최소값 (필수)
     - **lat2**: 위도 최대값 (필수)
     - **lng2**: 경도 최대값 (필수)
-    - **limit**: 반환할 결과 수 (기본값: 5000, 최대: 5000)
+    - **limit**: 반환할 결과 수 (기본값: 10000, 최대: 10000)
     """
     try:
         # 폐휴업 주유소 데이터에서 좌표로 검색

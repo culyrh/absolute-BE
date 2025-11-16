@@ -42,6 +42,7 @@ class GeoService:
         except Exception as e:
             print(f"⚠️ 지리 정보 서비스 초기화 실패: {str(e)}")
     
+
     def search_by_name(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """상호(주유소 이름)로 주유소 검색"""
         if not query or not self.data or "gas_station" not in self.data:
@@ -70,13 +71,14 @@ class GeoService:
         gas_df = self.data["gas_station"]
         
         # 주소 검색
-        filtered_df = gas_df[gas_df["주소"].astype(str).str.contains(query, na=False)]
+        mask = gas_df["주소"].astype(str).str.contains(query.strip(), na=False)
         
         # 상위 limit개만 반환
-        result = filtered_df.head(limit).to_dict('records')
+        result = gas_df[mask].head(limit).to_dict('records')
         
         return result
     
+
     def search_by_region(self, region: str, limit: int = 10) -> List[Dict[str, Any]]:
         """행정구역으로 주유소 검색"""
         if not region or not self.data or "gas_station" not in self.data:
@@ -98,6 +100,7 @@ class GeoService:
         
         return result
     
+
     def search_by_status(self, status: str, limit: int = 10) -> List[Dict[str, Any]]:
         """상태로 주유소 검색"""
         if not status or not self.data or "gas_station" not in self.data:
@@ -117,6 +120,7 @@ class GeoService:
         
         return result
     
+
     def get_all_regions(self) -> List[str]:
         """모든 권역 목록 조회"""
         if not self.data or "gas_station" not in self.data:
@@ -133,6 +137,7 @@ class GeoService:
         
         return regions
     
+
     def get_station_by_id(self, station_id: int) -> Optional[Dict[str, Any]]:
         """ID로 주유소 조회"""
         if not self.data or "gas_station" not in self.data:
@@ -152,6 +157,7 @@ class GeoService:
         
         # 첫 번째 결과 반환
         return filtered_df.iloc[0].to_dict()
+    
     
     def get_station_stats(self) -> Dict[str, Any]:
         """주유소 통계 정보"""
