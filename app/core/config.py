@@ -24,24 +24,22 @@ class Settings(BaseSettings):
     BUSINESS_FILE: str = str(DATA_DIR / "전국1000명당사업체수_행정동별.csv")
     CENTER_FILE: str = str(DATA_DIR / "대분류_센터로이드.csv")
     RECOMMEND_RESULT_FILE: str = str(DATA_DIR / "추천결과_행단위.csv")
-    # 데이터 통합 파일 경로 업데이트
     INTEGRATED_DATA_FILE: str = str(DATA_DIR / "train.csv")
     
-    # CORS 설정
+    # CORS
     CORS_ORIGINS: List[str] = ["*"]
     
-    # 데이터베이스 설정 (향후 구현)
-    DATABASE_URL: Optional[str] = None
-    
+    # DB (사용 안 하면 None)
+    postgres_host: Optional[str] = None
+    postgres_port: Optional[int] = None
+    postgres_db: Optional[str] = None
+    postgres_user: Optional[str] = None
+    postgres_password: Optional[str] = None
+
     class Config:
         env_file = ".env"
 
 
 @lru_cache()
 def get_settings() -> Settings:
-    """캐시된 설정 인스턴스 반환"""
     return Settings()
-
-
-# 설정 인스턴스 생성
-settings = get_settings()

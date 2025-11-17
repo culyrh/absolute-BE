@@ -294,30 +294,92 @@ async def search_stations(
         raise HTTPException(status_code=500, detail=f"주유소명 기반 검색 중 오류 발생: {str(e)}")
 
 
+@router.get("/{id}/recommend")
+async def get_station_recommend(
+    id: str = Path(..., description="좌표 기반 고유 ID"),
+    service: GeoService = Depends(get_geo_service),
+):
+    """
+    좌표 기반 고유 ID로 추천 활용방안 조회
+    """
+    try:
+        df = service.data.get("gas_station")
+
+        # id = "37384645_126941288" → lat,lng 복원
+        try:
+            lat_part, lng_part = id.split("_")
+            lat = float(lat_part) / 1000000
+            lng = float(lng_part) / 1000000
+        except:
+            raise HTTPException(status_code=400, detail="ID 형식 오류")
+
+        # 가까운 station 찾기
+        df["distance"] = ((df["위도"] - lat)**2 + (df["경도"] - lng)**2)
+        station = df.loc[df["distance"].idxmin()].to_dict()
+        station.pop("distance", None)
+
+        return JSONResponse(
+            content={
+                "id": id,
+                "name": station.get("상호"),
+                "address": station.get("주소"),
+                "recommend1": station.get("recommend1"),
+                "recommend2": station.get("recommend2"),
+                "recommend3": station.get("recommend3"),
+            }
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"추천 조회 중 오류: {e}")
+
+
 @router.get("/{id}/report", response_class=HTMLResponse)
 async def generate_station_report(
-    id: int = Path(..., description="주유소 ID"),
+    id: str = Path(..., description="좌표 기반 고유 ID (예: 35689819_128445642)"),
     service: GeoService = Depends(get_geo_service),
     recommend_service: RecommendationService = Depends(get_recommendation_service),
     report_service: LLMReportService = Depends(get_report_service)
 ):
     """
     주유소 입지 분석 보고서 (지적도 포함)
-    
-    Returns:
-        HTML 보고서
+    - 좌표 기반 고유 ID 사용
     """
     try:
-        # 1. 주유소 정보
-        station = service.get_station_by_id(id)
-        if not station:
-            raise HTTPException(status_code=404, detail="주유소를 찾을 수 없습니다.")
-        
-        lat = station.get('위도', 0)
-        lng = station.get('경도', 0)
+        df = service.data.get("gas_station")
+
+        if df is None or df.empty:
+            raise HTTPException(status_code=500, detail="주유소 데이터가 비어있습니다.")
+
+        # ----------------------------------
+        # 1) 좌표 기반 ID 파싱
+        # ----------------------------------
+        try:
+            lat_part, lng_part = id.split("_")
+            lat = float(lat_part) / 1_000_000
+            lng = float(lng_part) / 1_000_000
+        except:
+            raise HTTPException(status_code=400, detail="ID 형식 오류 (예: 35689819_128445642)")
+
+        # ----------------------------------
+        # 2) 가장 가까운 station 찾기
+        # ----------------------------------
+        df = df.loc[:, ~df.columns.duplicated()]  # 중복된 위도/경도 정리
+
+        df["distance"] = ((df["위도"] - lat)**2 + (df["경도"] - lng)**2)
+        nearest_idx = df["distance"].idxmin()
+        station = df.loc[nearest_idx].to_dict()
+        station.pop("distance", None)
+
+        # station 고유 id는 좌표 id로 재정의
+        station_id = id  
+
+        # ----------------------------------
+        # 기존 로직 그대로
+        # ----------------------------------
+
         name = station.get('상호', '주유소')
         address = station.get('주소', '')
-        
+
         # 2. 추천 결과
         try:
             recommendations = recommend_service.recommend_by_query(address, top_k=5)
@@ -328,11 +390,9 @@ async def generate_station_report(
 
         parcel_summary = None
 
-        # 3. 지적도 + 지도 생성
+        # 3. 지도 생성
         m = folium.Map(location=[lat, lng], zoom_start=17, tiles='OpenStreetMap')
 
-        # 3-1. 지적도 오버레이 (있을 때만)
-        nearby_parcels = None
         try:
             parcel_service = get_parcel_service()
             nearby_parcels = parcel_service.get_nearby_parcels(lat, lng, radius=0.003)
@@ -345,7 +405,7 @@ async def generate_station_report(
             station,
             rec_items,
             parcel_summary=parcel_summary,
-            station_id=id,
+            station_id=station_id
         )
 
         if nearby_parcels is not None and not nearby_parcels.empty:
@@ -605,34 +665,56 @@ async def get_station_cases():
 
 @router.get("/{id}", response_model=GasStationResponse)
 async def get_station_detail(
-    id: int = Path(..., description="주유소 ID"),
+    id: str = Path(..., description="좌표 기반 고유 ID"),
     service: GeoService = Depends(get_geo_service),
-    
 ):
     """
-    개별 주유소 상세 정보 API
-    
-    - **id**: 주유소 ID (필수)
+    좌표 기반 고유 ID로 주유소 상세 조회
     """
     try:
-        station = service.get_station_by_id(id)
-        
         df = service.data.get("gas_station")
-        print("컬럼:", df.columns.tolist())
-        print("id 앞부분:", df.head(5))
-        
-        if not station:
-            raise HTTPException(status_code=404, detail=f"ID가 {id}인 주유소를 찾을 수 없습니다.")
-        
-        # 캐싱 헤더 설정 (1일)
-        headers = {"Cache-Control": "public, max-age=86400"}
-        
-        return JSONResponse(
-            content=station,
-            headers=headers
-        )
+
+        if df is None or df.empty:
+            raise HTTPException(status_code=500, detail="주유소 데이터가 비어있습니다.")
+
+        # -------------------------
+        # 1) 중복된 위도/경도 컬럼 제거
+        # -------------------------
+        # station.csv → rename 과정에서 "위도", "경도"가 2개씩 생김 → 이걸 제거해야 distance 계산 가능
+        df = df.loc[:, ~df.columns.duplicated()]
+
+        # 필수 컬럼 체크
+        if "위도" not in df.columns or "경도" not in df.columns:
+            raise HTTPException(status_code=500, detail="위도/경도 컬럼이 누락되었습니다.")
+
+        # -------------------------
+        # 2) 좌표 기반 ID 파싱
+        # -------------------------
+        # 예: "35689819_128445642"
+        try:
+            lat_part, lng_part = id.split("_")
+            lat = float(lat_part) / 1_000_000
+            lng = float(lng_part) / 1_000_000
+        except Exception:
+            raise HTTPException(status_code=400, detail="ID 형식 오류 (예: 35689819_128445642)")
+
+        # -------------------------
+        # 3) 가장 가까운 station 찾기
+        # -------------------------
+        # 거리 계산
+        df["distance"] = ((df["위도"] - lat) ** 2 + (df["경도"] - lng) ** 2)
+
+        # 최소 거리 행 선택
+        nearest_idx = df["distance"].idxmin()
+        station = df.loc[nearest_idx].to_dict()
+
+        # distance 제거
+        station.pop("distance", None)
+
+        return JSONResponse(content=station)
+
     except HTTPException:
         raise
     except Exception as e:
-        print(f"주유소 상세 API 오류: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"주유소 상세 조회 중 오류가 발생했습니다: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"상세 조회 오류: {str(e)}")
+

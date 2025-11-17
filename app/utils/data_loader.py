@@ -8,16 +8,18 @@ from pathlib import Path
 import re
 import os
 from typing import Dict, List, Tuple, Optional, Union, Any
-from app.core.config import settings, DATA_DIR
-
+from app.core.config import get_settings, DATA_DIR
+settings = get_settings()
 
 def load_gas_station_data() -> pd.DataFrame:
-    """주유소 데이터 로드 (폐주유소 데이터 사용)"""
     try:
         file_path = settings.GAS_STATION_FILE
         df = pd.read_csv(file_path)
-        
-        # 컬럼 이름 매핑 - station.csv
+
+        # strip 해서 공백 제거
+        df.columns = df.columns.str.strip()
+
+        # 1) 기본 매핑
         column_mapping = {
             "field1": "년도", 
             "field2": "일자",
@@ -25,33 +27,34 @@ def load_gas_station_data() -> pd.DataFrame:
             "field4": "상태",
             "field5": "상호",
             "field6": "주소",
-
             "_GC_TYPE": "지번종류",
             "_CLEANADDR": "정제주소",
             "_PNU": "PNU",
-
-            "_X": "경도",
-            "_Y": "위도",
-
             "숙박업소(관광지수)": "관광지수",
             "인구[명]": "인구",
             "상권밀집도(비율)": "상권밀집도",
             "교통량(AADT)": "교통량",
             "adm_cd2": "법정동코드"
         }
-
-        # 컬럼 이름 변경
         df = df.rename(columns=column_mapping)
-        
-        # 주유소 데이터만 필터링
+
+        # 2) 경도/위도 중복 생성을 방지
+        # station.csv 원본에 이미 경도/위도가 있다면 rename하지 않는다.
+        if "경도" not in df.columns and "_X" in df.columns:
+            df = df.rename(columns={"_X": "경도"})
+        if "위도" not in df.columns and "_Y" in df.columns:
+            df = df.rename(columns={"_Y": "위도"})
+
+        # 3) 주유소만 필터
         df = df[df["업종"] == "주유소"].copy()
-        
-        # ID 부여 (인덱스 기반)
+
+        # 4) ID 부여
         df = df.reset_index(drop=True)
         df["id"] = df.index
-        
+
         print(f"📊 주유소 데이터 로드 완료: {len(df)}개 행")
         return df
+
     except Exception as e:
         print(f"❌ 주유소 데이터 로드 실패: {str(e)}")
         raise

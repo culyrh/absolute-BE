@@ -41,3 +41,4 @@ htmlcov/
 tests/__pycache__/
 
 /data/parcels
+/app/services/test_map.html
