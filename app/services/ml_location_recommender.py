@@ -16,19 +16,19 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+from app.config import DATA_DIR
+
 
 class MLLocationRecommender:
-    DATA_DIR_NAME = "data"
-    TRAIN_FILE_NAME = "train.csv"
-    STATION_FILE_NAME = "gas_station_features.csv"
+    DATA_DIR = DATA_DIR
+    TRAIN_FILE_NAME = DATA_DIR / "train.csv"
+    STATION_FILE_NAME = DATA_DIR / "gas_station_features.csv"
 
     FEATURE_COLS = ["인구[명]", "교통량(AADT)", "숙박업소(관광지수)", "상권밀집도(비율)"]
     TARGET_COL = "대분류"
 
     def __init__(self) -> None:
-        self.base_dir = Path(__file__).resolve().parents[2]
-        self.data_dir = self.base_dir / self.DATA_DIR_NAME
-
+        self.data_dir = DATA_DIR
         self.pipeline: Optional[Pipeline] = None
         self.classes_: Optional[np.ndarray] = None
         self.station_df: Optional[pd.DataFrame] = None
@@ -36,8 +36,7 @@ class MLLocationRecommender:
     # ========== 내부 유틸 ==========
 
     def _load_train_df(self) -> pd.DataFrame:
-        path = self.data_dir / self.TRAIN_FILE_NAME
-        df = pd.read_csv(path, encoding="utf-8-sig")
+        df = pd.read_csv(self.TRAIN_FILE_NAME, encoding="utf-8-sig")
 
         for col in self.FEATURE_COLS:
             df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -74,12 +73,10 @@ class MLLocationRecommender:
         if self.station_df is not None:
             return
 
-        path = self.data_dir / self.STATION_FILE_NAME
-
         try:
-            df = pd.read_csv(path, encoding="utf-8-sig")
+            df = pd.read_csv(self.STATION_FILE_NAME, encoding="utf-8-sig")
         except Exception:
-            df = pd.read_excel(path)
+            df = pd.read_excel(self.STATION_FILE_NAME)
 
         self.station_df = df
 
@@ -150,16 +147,12 @@ class MLLocationRecommender:
         keyword: str,
         top_n: int = 3,
     ) -> Dict[str, Any]:
-        """
-        상호명/업체명/주소 등에 keyword가 포함된 주유소를 찾아
-        그 행의 피처로 대분류 top-N 추천.
-        """
+
         self._ensure_trained()
         self._ensure_station_df()
 
         df = self.station_df
 
-        # 1) 실제 존재하는 이름/주소 컬럼 자동 감지
         name_candidates = ["상호명", "업체명", "상호", "주유소명"]
         addr_candidates = ["주소", "소재지", "관할주소"]
 
@@ -169,7 +162,6 @@ class MLLocationRecommender:
         if not name_cols and not addr_cols:
             raise ValueError("gas_station_features에서 주유소 이름/주소 컬럼을 찾을 수 없습니다.")
 
-        # 2) 검색 마스크 생성
         masks = []
 
         for c in name_cols:
@@ -193,12 +185,10 @@ class MLLocationRecommender:
                 "message": f"'{keyword}' 에 해당하는 주유소를 gas_station_features에서 찾을 수 없습니다.",
             }
 
-        # 일단 첫 번째 매칭만 사용
         row = candidates.iloc[0]
 
         results = self._predict_from_row(row, top_n=top_n)
 
-        # 대표 이름/주소 컬럼 하나씩 선택
         name_col = name_cols[0] if name_cols else None
         addr_col = addr_cols[0] if addr_cols else None
 
