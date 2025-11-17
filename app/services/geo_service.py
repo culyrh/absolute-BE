@@ -70,13 +70,40 @@ class GeoService:
         
         gas_df = self.data["gas_station"]
         
-        # 주소 검색
-        mask = gas_df["주소"].astype(str).str.contains(query.strip(), na=False)
-        
-        # 상위 limit개만 반환
-        result = gas_df[mask].head(limit).to_dict('records')
-        
-        return result
+        parts = query.replace(",", " ").split()
+        parts = [p.strip() for p in parts if p.strip()]
+
+        sido = parts[0] if len(parts) > 0 else None
+        sig = parts[1] if len(parts) > 1 else None
+        emd = parts[2] if len(parts) > 2 else None
+
+        if "주소" not in gas_df.columns:
+            return []
+
+    # 1️⃣ 시도만 있는 경우 — 예: '광주광역시'
+        if sido and not sig:
+            filtered = gas_df[gas_df["주소"].str.contains(sido, na=False)]
+
+        # 2️⃣ 시도 + 시군구 — 예: '광주광역시 북구'
+        elif sido and sig and not emd:
+            filtered = gas_df[
+                gas_df["주소"].str.contains(sido, na=False)
+                & gas_df["주소"].str.contains(sig, na=False)
+            ]
+
+        # 3️⃣ 시도 + 시군구 + 읍면동 — 예: '광주광역시 북구 양산동'
+        elif sido and sig and emd:
+            filtered = gas_df[
+                gas_df["주소"].str.contains(sido, na=False)
+                & gas_df["주소"].str.contains(sig, na=False)
+                & gas_df["주소"].str.contains(emd, na=False)
+            ]
+
+        else:
+            filtered = gas_df
+
+        # 상위 limit 개수 반환
+        return filtered.head(limit).to_dict("records")
     
 
     def search_by_region(self, region: str, limit: int = 10) -> List[Dict[str, Any]]:
