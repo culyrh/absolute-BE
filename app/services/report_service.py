@@ -299,7 +299,11 @@ class LLMReportService:
 
         insights: List[str] = []
         if recommendations:
-            top_type = recommendations[0].get("type") or recommendations[0].get("usage_type")
+            top_type = (
+                recommendations[0].get("type")
+                or recommendations[0].get("usage_type")
+                or recommendations[0].get("category")
+            )
             if top_type:
                 insights.append(f"추천 데이터 상 우선 검토가 필요한 용도는 '{top_type}' 유형입니다.")
         insights.append("주변 상권 밀도와 교통 접근성을 정량 분석해 수요 포착 범위를 확장할 필요가 있습니다.")
@@ -407,8 +411,8 @@ class LLMReportService:
 
         lines = []
         for item in recommendations:
-            usage = item.get("type") or item.get("usage_type") or "미정"
-            score = item.get("score") or item.get("similarity") or item.get("rank")
+            usage = item.get("type") or item.get("usage_type") or item.get("category") or "미정"
+            score = item.get("score") or item.get("similarity") or item.get("rank") or item.get("probability")
             description = item.get("description")
             line = usage
             if score is not None:

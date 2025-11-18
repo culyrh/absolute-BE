@@ -8,6 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints import stations, usage_types, ml_recommend
 from app.core.config import get_settings
 
+from dotenv import load_dotenv
+load_dotenv()
+
 settings = get_settings()
 
 # FastAPI 애플리케이션 생성
