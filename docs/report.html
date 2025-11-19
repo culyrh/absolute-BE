@@ -1,15 +1,12 @@
-<!-- LLM 보고서 response 확인용 입니다.
-    api로 요청했을 시 아래와 같은 응답이 나오고,
-    요청 시마다 텍스트가 매번 바뀝니다.
-    나중에 보고서 수정되면 지워주세요.
--->
+<!-- /api/stations/{id}/recommend 로 추천 결과 수정 테스트 문서버전 -->
+
 
 <!DOCTYPE html>
 <html lang="ko">
 
 <head>
   <meta charset="utf-8">
-  <title>동흥주유소 입지 분석 보고서</title>
+  <title>주식회사 대양씨앤씨 경복궁주유소 입지 분석 보고서</title>
   <style>
     :root {
       --bg: #ecf4ee;
@@ -226,8 +223,8 @@
 <body>
   <div class="page">
     <div class="hero">
-      <h1>📍 동흥주유소</h1>
-      <p>대구광역시 달성군 비슬로566 (현풍면)</p>
+      <h1>📍 주식회사 대양씨앤씨 경복궁주유소</h1>
+      <p>서울특별시 종로구 율곡로6 (중학동)</p>
     </div>
 
     <div class="section grid two">
@@ -255,7 +252,7 @@
             &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no&quot; /&gt;
             &lt;style&gt;
-                #map_5042605d8b7f470af7f8dbf66d411464 {
+                #map_835b1023a240a1025606e9c4f9d7720e {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -311,16 +308,16 @@
         &lt;/div&gt;
         
     
-            &lt;div class=&quot;folium-map&quot; id=&quot;map_5042605d8b7f470af7f8dbf66d411464&quot; &gt;&lt;/div&gt;
+            &lt;div class=&quot;folium-map&quot; id=&quot;map_835b1023a240a1025606e9c4f9d7720e&quot; &gt;&lt;/div&gt;
         
 &lt;/body&gt;
 &lt;script&gt;
     
     
-            var map_5042605d8b7f470af7f8dbf66d411464 = L.map(
-                &quot;map_5042605d8b7f470af7f8dbf66d411464&quot;,
+            var map_835b1023a240a1025606e9c4f9d7720e = L.map(
+                &quot;map_835b1023a240a1025606e9c4f9d7720e&quot;,
                 {
-                    center: [35.689819, 128.445642],
+                    center: [37.575457, 126.980522],
                     crs: L.CRS.EPSG3857,
                     ...{
   &quot;zoom&quot;: 17,
@@ -335,7 +332,7 @@
 
         
     
-            var tile_layer_d12659ed9820c6eda6a3840f04e57394 = L.tileLayer(
+            var tile_layer_d66d598c5bb84462115c5664d11a4f06 = L.tileLayer(
                 &quot;https://tile.openstreetmap.org/{z}/{x}/{y}.png&quot;,
                 {
   &quot;minZoom&quot;: 0,
@@ -352,17 +349,17 @@
             );
         
     
-            tile_layer_d12659ed9820c6eda6a3840f04e57394.addTo(map_5042605d8b7f470af7f8dbf66d411464);
+            tile_layer_d66d598c5bb84462115c5664d11a4f06.addTo(map_835b1023a240a1025606e9c4f9d7720e);
         
     
-            var marker_037fb8c7b48f85b1fcd78befe0f90778 = L.marker(
-                [35.689819, 128.445642],
+            var marker_afe29e30fc29b8f5e356a93fac98c1bb = L.marker(
+                [37.575457, 126.980522],
                 {
 }
-            ).addTo(map_5042605d8b7f470af7f8dbf66d411464);
+            ).addTo(map_835b1023a240a1025606e9c4f9d7720e);
         
     
-            var icon_e8586b507c7a834d469b01eafc9f39dc = L.AwesomeMarkers.icon(
+            var icon_2c2f5843221d2ce3fd46bf1eeaf3fb34 = L.AwesomeMarkers.icon(
                 {
   &quot;markerColor&quot;: &quot;red&quot;,
   &quot;iconColor&quot;: &quot;white&quot;,
@@ -373,27 +370,27 @@
             );
         
     
-        var popup_2b34a69bd9de39aeba64d8beddd47a12 = L.popup({
+        var popup_5dcbd1b51145b68878db7611b4ede1d7 = L.popup({
   &quot;maxWidth&quot;: 320,
   &quot;minWidth&quot;: 220,
 });
 
         
             
-                var html_0fcd6cf08389a199523f1ea0287462be = $(`&lt;div id=&quot;html_0fcd6cf08389a199523f1ea0287462be&quot; style=&quot;width: 100.0%; height: 100.0%;&quot;&gt;         &lt;div style=&#x27;white-space: normal; width: 260px; line-height: 1.4;&#x27;&gt;             &lt;div style=&#x27;font-weight: 600; margin-bottom: 4px;&#x27;&gt;동흥주유소&lt;/div&gt;             &lt;div&gt;대구광역시 달성군 비슬로566 (현풍면)&lt;/div&gt;         &lt;/div&gt;         &lt;/div&gt;`)[0];
-                popup_2b34a69bd9de39aeba64d8beddd47a12.setContent(html_0fcd6cf08389a199523f1ea0287462be);
+                var html_08afe892cf40be0d2f8d25b25f31d45a = $(`&lt;div id=&quot;html_08afe892cf40be0d2f8d25b25f31d45a&quot; style=&quot;width: 100.0%; height: 100.0%;&quot;&gt;         &lt;div style=&#x27;white-space: normal; width: 260px; line-height: 1.4;&#x27;&gt;             &lt;div style=&#x27;font-weight: 600; margin-bottom: 4px;&#x27;&gt;주식회사 대양씨앤씨 경복궁주유소&lt;/div&gt;             &lt;div&gt;서울특별시 종로구 율곡로6 (중학동)&lt;/div&gt;         &lt;/div&gt;         &lt;/div&gt;`)[0];
+                popup_5dcbd1b51145b68878db7611b4ede1d7.setContent(html_08afe892cf40be0d2f8d25b25f31d45a);
             
         
 
-        marker_037fb8c7b48f85b1fcd78befe0f90778.bindPopup(popup_2b34a69bd9de39aeba64d8beddd47a12)
+        marker_afe29e30fc29b8f5e356a93fac98c1bb.bindPopup(popup_5dcbd1b51145b68878db7611b4ede1d7)
         ;
 
         
     
     
-            marker_037fb8c7b48f85b1fcd78befe0f90778.bindTooltip(
+            marker_afe29e30fc29b8f5e356a93fac98c1bb.bindTooltip(
                 `&lt;div&gt;
-                     동흥주유소
+                     주식회사 대양씨앤씨 경복궁주유소
                  &lt;/div&gt;`,
                 {
   &quot;sticky&quot;: true,
@@ -401,27 +398,27 @@
             );
         
     
-                marker_037fb8c7b48f85b1fcd78befe0f90778.setIcon(icon_e8586b507c7a834d469b01eafc9f39dc);
+                marker_afe29e30fc29b8f5e356a93fac98c1bb.setIcon(icon_2c2f5843221d2ce3fd46bf1eeaf3fb34);
             
     
-            var circle_5edabb056a9fe7f28404e54acc4bce2c = L.circle(
-                [35.689819, 128.445642],
+            var circle_c1be8a6971007891ade3b99a30e1fe89 = L.circle(
+                [37.575457, 126.980522],
                 {&quot;bubblingMouseEvents&quot;: true, &quot;color&quot;: &quot;red&quot;, &quot;dashArray&quot;: null, &quot;dashOffset&quot;: null, &quot;fill&quot;: true, &quot;fillColor&quot;: &quot;red&quot;, &quot;fillOpacity&quot;: 0.1, &quot;fillRule&quot;: &quot;evenodd&quot;, &quot;lineCap&quot;: &quot;round&quot;, &quot;lineJoin&quot;: &quot;round&quot;, &quot;opacity&quot;: 1.0, &quot;radius&quot;: 300, &quot;stroke&quot;: true, &quot;weight&quot;: 3}
-            ).addTo(map_5042605d8b7f470af7f8dbf66d411464);
+            ).addTo(map_835b1023a240a1025606e9c4f9d7720e);
         
     
-        var popup_bc9b96cdca4aea94b126f7875c7a58f0 = L.popup({
+        var popup_9a48aba52746060ab36a315551fd51f1 = L.popup({
   &quot;maxWidth&quot;: &quot;100%&quot;,
 });
 
         
             
-                var html_e3c8fbec40d2f7d2a56a97e7c9a8644a = $(`&lt;div id=&quot;html_e3c8fbec40d2f7d2a56a97e7c9a8644a&quot; style=&quot;width: 100.0%; height: 100.0%;&quot;&gt;반경 300m&lt;/div&gt;`)[0];
-                popup_bc9b96cdca4aea94b126f7875c7a58f0.setContent(html_e3c8fbec40d2f7d2a56a97e7c9a8644a);
+                var html_84cd211e10d6cf43571ef19bd7d4fabc = $(`&lt;div id=&quot;html_84cd211e10d6cf43571ef19bd7d4fabc&quot; style=&quot;width: 100.0%; height: 100.0%;&quot;&gt;반경 300m&lt;/div&gt;`)[0];
+                popup_9a48aba52746060ab36a315551fd51f1.setContent(html_84cd211e10d6cf43571ef19bd7d4fabc);
             
         
 
-        circle_5edabb056a9fe7f28404e54acc4bce2c.bindPopup(popup_bc9b96cdca4aea94b126f7875c7a58f0)
+        circle_c1be8a6971007891ade3b99a30e1fe89.bindPopup(popup_9a48aba52746060ab36a315551fd51f1)
         ;
 
         
@@ -438,22 +435,22 @@
 
       <div class="card glass analysis-block">
         <div class="section-title">🤖 LLM 기반 분석 요약</div>
-        <p style="line-height: 1.6;">동흥주유소는 대구광역시 달성군에 위치하여 교통 접근성이 우수한 지역에 자리잡고 있습니다. 주변 필지 데이터가 부족하지만, 주유소의 위치 특성을 고려할
-          때 다양한 활용 가능성이 존재합니다.</p>
+        <p style="line-height: 1.6;">주식회사 대양씨앤씨 경복궁주유소는 서울특별시 종로구에 위치하여 교통 접근성이 우수한 입지 특성을 보유하고 있습니다. 주변 환경을 고려할 때, 다양한
+          상업 및 숙박시설로의 전환 가능성이 높습니다.</p>
         <div>
           <h3 style="margin-bottom: 8px; color: #2c3e50;">핵심 인사이트</h3>
           <ul style="padding-left: 20px; margin-top: 0;">
-            <li style="margin-bottom: 6px;">업무시설에 대한 수요가 높아 해당 지역에 사무공간 개발이 유망할 것으로 판단됩니다.</li>
-            <li style="margin-bottom: 6px;">판매시설의 점수가 높아, 소매업체 유치가 지역 경제 활성화에 기여할 수 있습니다.</li>
-            <li style="margin-bottom: 6px;">자동차 관련 시설의 필요성이 제기되며, 차량 서비스 및 정비업체 유치가 효과적일 것입니다.</li>
+            <li style="margin-bottom: 6px;">주유소의 위치는 관광지와 가까워 숙박시설로의 활용 가능성이 높습니다.</li>
+            <li style="margin-bottom: 6px;">주변 인프라가 부족하므로, 새로운 시설 개발 시 지역 사회의 요구를 반영할 필요가 있습니다.</li>
+            <li style="margin-bottom: 6px;">주유소의 기존 시설을 활용하여 근린생활시설로 전환할 경우, 지역 주민의 편의성을 높일 수 있습니다.</li>
           </ul>
         </div>
         <div>
           <h3 style="margin-bottom: 8px; color: #2c3e50;">권장 실행 항목</h3>
           <ol style="padding-left: 20px; margin-top: 0;">
-            <li style="margin-bottom: 6px;">주유소 부지를 활용하여 업무시설 개발을 추진하는 방안을 검토해야 합니다.</li>
-            <li style="margin-bottom: 6px;">주변 상권 분석을 통해 적합한 판매시설 유치를 위한 마케팅 전략을 수립해야 합니다.</li>
-            <li style="margin-bottom: 6px;">자동차 관련 서비스 업체와의 협력 방안을 모색하여 지역 내 차량 관련 서비스의 다양성을 높여야 합니다.</li>
+            <li style="margin-bottom: 6px;">숙박시설 개발을 위한 시장 조사 및 타당성 분석을 실시해야 합니다.</li>
+            <li style="margin-bottom: 6px;">주변 주민과의 소통을 통해 필요한 시설에 대한 의견을 수렴하고 반영해야 합니다.</li>
+            <li style="margin-bottom: 6px;">기존 주유소 시설을 활용한 근린생활시설 개발 계획을 수립하고, 관련 인허가 절차를 진행해야 합니다.</li>
           </ol>
         </div>
       </div>
@@ -466,31 +463,31 @@
 
           <div class="highlight-card">
             <div class="highlight-rank">Top 1</div>
-            <div class="highlight-title">업무시설</div>
-            <p class="highlight-desc">ML 기반 추천 순위 1위</p>
+            <div class="highlight-title">숙박시설</div>
+            <p class="highlight-desc">추천 API 결과 순위 1위</p>
             <div class="rec-chips">
-              <span class="chip ghost">스타트업 스튜디오</span><span class="chip ghost">라이트 오피스·회의실</span><span
-                class="chip ghost">공공·민간 합동 거점</span>
+              <span class="chip ghost">스마트 체류형 숙소</span><span class="chip ghost">마이크로 호텔</span><span
+                class="chip ghost">관광·MICE 연계 숙박</span>
             </div>
           </div>
 
           <div class="highlight-card">
             <div class="highlight-rank">Top 2</div>
-            <div class="highlight-title">판매시설</div>
-            <p class="highlight-desc">ML 기반 추천 순위 2위</p>
+            <div class="highlight-title">공장</div>
+            <p class="highlight-desc">추천 API 결과 순위 2위</p>
             <div class="rec-chips">
-              <span class="chip ghost">편의형 슈퍼마켓</span><span class="chip ghost">지역 특화 리테일</span><span
-                class="chip ghost">팝업 스토어 존</span>
+              <span class="chip ghost">경량 조립·패키징</span><span class="chip ghost">스마트 마이크로 팩토리</span><span
+                class="chip ghost">지역 특화 생산 거점</span>
             </div>
           </div>
 
           <div class="highlight-card">
             <div class="highlight-rank">Top 3</div>
-            <div class="highlight-title">자동차관련시설</div>
-            <p class="highlight-desc">ML 기반 추천 순위 3위</p>
+            <div class="highlight-title">근린생활시설</div>
+            <p class="highlight-desc">추천 API 결과 순위 3위</p>
             <div class="rec-chips">
-              <span class="chip ghost">EV 급속·완속 복합 충전소</span><span class="chip ghost">프리미엄 세차·디테일링</span><span
-                class="chip ghost">모빌리티 공유 거점</span>
+              <span class="chip ghost">카페·베이커리</span><span class="chip ghost">드라이브 스루 매장</span><span
+                class="chip ghost">키즈·펫 프렌들리 커뮤니티</span>
             </div>
           </div>
 
@@ -505,12 +502,11 @@
         <div class="rec-card">
           <div class="rec-rank">1</div>
           <div class="rec-body">
-            <div class="rec-title">업무시설</div>
-            <div class="rec-meta">사용한 알고리즘: ml_recommend · 점수/확률: 0.232</div>
-            <div class="rec-desc">ML 기반 추천 순위 1위</div>
+            <div class="rec-title">숙박시설</div>
+            <div class="rec-desc">추천 API 결과 순위 1위</div>
             <div class="rec-chips">
-              <span class="chip">스타트업 스튜디오</span><span class="chip">라이트 오피스·회의실</span><span class="chip">공공·민간 합동
-                거점</span>
+              <span class="chip">스마트 체류형 숙소</span><span class="chip">마이크로 호텔</span><span class="chip">관광·MICE 연계
+                숙박</span>
             </div>
           </div>
         </div>
@@ -518,11 +514,11 @@
         <div class="rec-card">
           <div class="rec-rank">2</div>
           <div class="rec-body">
-            <div class="rec-title">판매시설</div>
-            <div class="rec-meta">사용한 알고리즘: ml_recommend · 점수/확률: 0.153</div>
-            <div class="rec-desc">ML 기반 추천 순위 2위</div>
+            <div class="rec-title">공장</div>
+            <div class="rec-desc">추천 API 결과 순위 2위</div>
             <div class="rec-chips">
-              <span class="chip">편의형 슈퍼마켓</span><span class="chip">지역 특화 리테일</span><span class="chip">팝업 스토어 존</span>
+              <span class="chip">경량 조립·패키징</span><span class="chip">스마트 마이크로 팩토리</span><span class="chip">지역 특화 생산
+                거점</span>
             </div>
           </div>
         </div>
@@ -530,12 +526,11 @@
         <div class="rec-card">
           <div class="rec-rank">3</div>
           <div class="rec-body">
-            <div class="rec-title">자동차관련시설</div>
-            <div class="rec-meta">사용한 알고리즘: ml_recommend · 점수/확률: 0.141</div>
-            <div class="rec-desc">ML 기반 추천 순위 3위</div>
+            <div class="rec-title">근린생활시설</div>
+            <div class="rec-desc">추천 API 결과 순위 3위</div>
             <div class="rec-chips">
-              <span class="chip">EV 급속·완속 복합 충전소</span><span class="chip">프리미엄 세차·디테일링</span><span class="chip">모빌리티 공유
-                거점</span>
+              <span class="chip">카페·베이커리</span><span class="chip">드라이브 스루 매장</span><span class="chip">키즈·펫 프렌들리
+                커뮤니티</span>
             </div>
           </div>
         </div>
