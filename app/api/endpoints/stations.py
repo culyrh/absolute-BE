@@ -465,8 +465,8 @@ async def get_station_recommend(
         raise HTTPException(status_code=500, detail=f"추천 조회 중 오류: {e}")
 
 
-@router.get("/{id}/statics")
-async def get_station_statics(
+@router.get("/{id}/stats")
+async def get_station_stats(
     id: str = Path(..., description="좌표 기반 고유 ID (예: 35689819_128445642)"),
     service: GeoService = Depends(get_geo_service),
 ):
