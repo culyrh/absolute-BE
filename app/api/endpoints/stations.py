@@ -6,6 +6,8 @@ from collections import Counter
 from html import escape
 from typing import Optional, List, Dict, Any
 
+import traceback
+import pandas as pd
 import folium
 import math
 from fastapi import APIRouter, Depends, Query, HTTPException, Path
@@ -426,7 +428,7 @@ async def search_stations(
 
 @router.get("/{id}/recommend")
 async def get_station_recommend(
-    id: str = Path(..., description="좌표 기반 고유 ID"),
+    id: str = Path(..., description="좌표 기반 고유 ID (예: 35689819_128445642)"),
     service: GeoService = Depends(get_geo_service),
 ):
     """
@@ -461,6 +463,193 @@ async def get_station_recommend(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"추천 조회 중 오류: {e}")
+
+
+@router.get("/{id}/statics")
+async def get_station_statics(
+    id: str = Path(..., description="좌표 기반 고유 ID (예: 35689819_128445642)"),
+    service: GeoService = Depends(get_geo_service),
+):
+    """
+    특정 주유소(id)의 정량 지표 + 권역(train 기반) 비교 API
+    - parcel_300m, parcel_500m, 교통량, 관광지수, 인구, 상권밀집도
+    - train.csv 기반 시도(region_code)별 평균과 비교
+    """
+
+    try:
+        # -------------------------------------------
+        # 1) station.csv 로딩
+        # -------------------------------------------
+        df_station = service.data.get("gas_station")
+        if df_station is None or df_station.empty:
+            raise HTTPException(status_code=500, detail="station.csv 없음")
+
+        df_station = df_station.loc[:, ~df_station.columns.duplicated()]
+
+        # -------------------------------------------
+        # 2) 좌표 기반 ID 파싱
+        # -------------------------------------------
+        try:
+            lat_part, lng_part = id.split("_")
+            lat = float(lat_part) / 1_000_000
+            lng = float(lng_part) / 1_000_000
+        except:
+            raise HTTPException(status_code=400, detail="ID 형식 오류")
+
+        # -------------------------------------------
+        # 3) 가장 가까운 station 찾기
+        # -------------------------------------------
+        df_station["distance"] = (
+            (df_station["위도"] - lat)**2 +
+            (df_station["경도"] - lng)**2
+        )
+        station = df_station.loc[df_station["distance"].idxmin()].to_dict()
+        station.pop("distance", None)
+
+        # -------------------------------------------
+        # 4-A) station에서 adm_cd2 원본 추출
+        # -------------------------------------------
+        adm_raw = None
+
+        for key in ["adm_cd2", "법정동코드", "법정동 코드"]:
+            if station.get(key) is not None:
+                adm_raw = station.get(key)
+                break
+
+        if adm_raw is None:
+            raise HTTPException(status_code=500, detail="station adm_cd2 없음")
+
+        # -------------------------------------------
+        # 4-B) adm_cd2 정규화 함수
+        # -------------------------------------------
+        def normalize_adm_cd2(value):
+            if value is None:
+                return None
+
+            s = str(value).strip()
+
+            # float 형태 ".0" 제거
+            if s.endswith(".0"):
+                s = s[:-2]
+
+            # 숫자만 남기기
+            s = "".join(ch for ch in s if ch.isdigit())
+
+            # 8자리 법정동 → 10자리 변환
+            if len(s) == 8:
+                s += "00"
+
+            # 길이 부족하면 0으로 패딩
+            if len(s) < 10:
+                s = s.ljust(10, "0")
+
+            # 10자리로 자르기
+            return s[:10]
+
+        # -------------------------------------------
+        # 5) station region_code 생성
+        # -------------------------------------------
+        adm_cd = normalize_adm_cd2(adm_raw)
+        if not adm_cd:
+            raise HTTPException(status_code=500, detail="station adm_cd2 오류")
+
+        region_code = adm_cd[:2]
+
+        # -------------------------------------------
+        # 6) train.csv 로드
+        # -------------------------------------------
+        from app.services.geoai_config import GeoAIConfig
+        cfg = GeoAIConfig()
+
+        train_path = cfg.data_dir / "train.csv"
+        if not train_path.exists():
+            raise HTTPException(status_code=500, detail="train.csv 없음")
+
+        df_train = pd.read_csv(train_path)
+
+        df_train["adm_cd2_norm"] = df_train["adm_cd2"].apply(normalize_adm_cd2)
+        df_train["region_code"] = df_train["adm_cd2_norm"].str[:2]
+
+        region_train = df_train[df_train["region_code"] == region_code]
+        if region_train.empty:
+            raise HTTPException(
+                status_code=404,
+                detail=f"train.csv 에 region_code={region_code} 데이터 없음"
+            )
+
+        # -------------------------------------------
+        # 7) station ↔ train 지표 매칭
+        # -------------------------------------------
+        FEATURE_COLS = {
+            "traffic": ("교통량", "교통량(AADT)"),
+            "tourism": ("관광지수", "숙박업소(관광지수)"),
+            "population": ("인구", "인구[명]"),
+            "commercial_density": ("상권밀집도", "상권밀집도(비율)"),
+            "parcel_300m": ("parcel_300m", "parcel_300m"),
+            "parcel_500m": ("parcel_500m", "parcel_500m"),
+        }
+
+        # -------------------------------------------
+        # 8) station 지표 읽기
+        # -------------------------------------------
+        metrics = {
+            name: station.get(st_col)
+            for name, (st_col, tr_col) in FEATURE_COLS.items()
+        }
+
+        # -------------------------------------------
+        # 9) train 평균 계산
+        # -------------------------------------------
+        train_mean = {
+            name: float(region_train[tr_col].mean())
+            for name, (st_col, tr_col) in FEATURE_COLS.items()
+        }
+
+        # -------------------------------------------
+        # 10) 변화율 계산
+        # -------------------------------------------
+        def percent_change(a, b):
+            if a is None or b is None or b == 0:
+                return None
+            return (float(a) - float(b)) / float(b) * 100
+
+        relative = {
+            name: percent_change(metrics[name], train_mean[name])
+            for name in FEATURE_COLS.keys()
+        }
+
+        # -------------------------------------------
+        # 11) 백분위 계산
+        # -------------------------------------------
+        def percentile(series, value):
+            if value is None:
+                return None
+            arr = series.dropna().values
+            if len(arr) == 0:
+                return None
+            return float((arr < value).mean() * 100)
+
+        percentiles = {
+            name: percentile(region_train[tr_col], metrics[name])
+            for name, (st_col, tr_col) in FEATURE_COLS.items()
+        }
+
+        # -------------------------------------------
+        # 12) 최종 응답
+        # -------------------------------------------
+        return JSONResponse(
+            content={
+                "id": id,
+                "region_code": region_code,
+                "metrics": metrics,
+                "train_mean": train_mean,
+                "relative": relative,
+                "percentile": percentiles,
+            }
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{id}/report", response_class=HTMLResponse)
@@ -933,7 +1122,7 @@ async def get_station_cases():
 
 @router.get("/{id}", response_model=GasStationResponse)
 async def get_station_detail(
-    id: str = Path(..., description="좌표 기반 고유 ID"),
+    id: str = Path(..., description="좌표 기반 고유 ID (예: 35689819_128445642)"),
     service: GeoService = Depends(get_geo_service),
 ):
     """
