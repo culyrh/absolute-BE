@@ -1,239 +1,190 @@
-<!-- /api/stations/{id}/recommend 로 추천 결과 수정 테스트 문서버전 -->
+<!-- /api/stations/{id}/recommend 로 추천 결과 수정 테스트
+ +pdf추가 문서버전 -->
+        <!DOCTYPE html>
+        <html lang="ko">
+        <head>
+            <meta charset="utf-8">
+            <title>동흥주유소 입지 분석 보고서</title>
+            <style>
+                :root {
+                    --bg: #ecf4ee;
+                    --card: #ffffff;
+                    --accent: #2fb36f;
+                    --accent-2: #1f9255;
+                    --text: #10291a;
+                    --muted: #5f7263;
+                    --border: #d9e7dc;
+                }
+                * { box-sizing: border-box; }
+                body {
+                    font-family: 'Noto Sans KR', 'Pretendard', Arial, sans-serif;
+                    margin: 0;
+                    padding: 0;
+                    background: radial-gradient(circle at 20% 20%, rgba(47,179,111,0.10), transparent 32%),
+                                radial-gradient(circle at 80% 0%, rgba(31,146,85,0.08), transparent 32%),
+                                var(--bg);
+                    color: var(--text);
+                    line-height: 1.6;
+                }
+                .page {
+                    max-width: 1180px;
+                    margin: 32px auto;
+                    padding: 8px 18px 42px;
+                }
+                .hero {
+                    background: linear-gradient(135deg, #2fb36f, #1f9255);
+                    color: white;
+                    border-radius: 18px;
+                    padding: 24px 32px;
+                    box-shadow: 0 18px 40px rgba(31, 146, 85, 0.30);
+                }
+                .hero-content {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 12px;
+                    flex-wrap: wrap;
+                }
+                .hero-info h1 { margin: 0 0 6px 0; font-size: 30px; }
+                .hero-info p { margin: 0; color: rgba(255,255,255,0.9); }
+                .pdf-btn {
+                    background: white;
+                    color: #1f7a4c;
+                    border: none;
+                    border-radius: 12px;
+                    padding: 12px 16px;
+                    font-weight: 700;
+                    box-shadow: 0 10px 26px rgba(17, 24, 39, 0.08);
+                    cursor: pointer;
+                    transition: transform 0.1s ease, box-shadow 0.1s ease;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .pdf-btn:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 14px 30px rgba(17, 24, 39, 0.12);
+                }
+                .section { margin-top: 20px; }
+                .section-title {
+                    font-size: 19px;
+                    margin-bottom: 12px;
+                    color: #0f172a;
+                    letter-spacing: -0.02em;
+                }
+                .card {
+                    background: var(--card);
+                    border-radius: 14px;
+                    padding: 18px 20px;
+                    box-shadow: 0 12px 30px rgba(17, 24, 39, 0.06);
+                    border: 1px solid var(--border);
+                }
+                .glass {
+                    background: linear-gradient(135deg, rgba(47,179,111,0.08), rgba(31,146,85,0.06));
+                    border: 1px solid rgba(255,255,255,0.35);
+                }
+                .map-container {
+                    height: 520px;
+                    border-radius: 14px;
+                    overflow: hidden;
+                    border: 1px solid var(--border);
+                }
+                .map-container figure { margin: 0; height: 100%; }
+                .map-container > div:first-child { height: 100%; }
+                .map-container > div:first-child > div {
+                    position: relative !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                    padding: 0 !important;
+                }
+                .map-container iframe {
+                    width: 100% !important;
+                    height: 100% !important;
+                    border: 0;
+                    display: block;
+                }
+                .map-note { margin-top: 8px; color: var(--muted); font-size: 13px; }
+                .muted { color: var(--muted); }
+                .grid { display: grid; gap: 14px; }
+                .grid.two { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+                .rec-card {
+                    display: grid;
+                    grid-template-columns: 62px 1fr;
+                    gap: 14px;
+                    padding: 14px;
+                    border-radius: 12px;
+                    background: #f4fbf6;
+                    border: 1px solid var(--border);
+                }
+                .rec-rank {
+                    width: 48px; height: 48px;
+                    border-radius: 12px;
+                    background: linear-gradient(135deg, #2fb36f, #1f9255);
+                    color: white;
+                    display: grid;
+                    place-items: center;
+                    font-weight: 700;
+                    font-size: 18px;
+                }
+                .rec-title { font-weight: 700; font-size: 17px; color: #0f172a; margin-bottom: 2px; }
+                .rec-meta { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+                .rec-desc { color: #27303f; font-size: 14px; margin-bottom: 10px; }
+                .rec-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+                .chip {
+                    background: #e6f7ed;
+                    color: #1f7a4c;
+                    padding: 6px 10px;
+                    border-radius: 999px;
+                    font-size: 12px;
+                    border: 1px solid #b2e3c6;
+                }
+                .chip.ghost {
+                    background: rgba(47,179,111,0.10);
+                    color: #1f7a4c;
+                    border-color: rgba(47,179,111,0.25);
+                }
+                .highlight-wrap {
+                    background: linear-gradient(135deg, rgba(47,179,111,0.10), rgba(31,146,85,0.10));
+                    border: 1px solid rgba(47,179,111,0.20);
+                    border-radius: 14px;
+                    padding: 16px;
+                }
+                .highlight-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+                .highlight-card {
+                    background: white;
+                    border-radius: 12px;
+                    padding: 14px;
+                    border: 1px solid var(--border);
+                    box-shadow: 0 12px 30px rgba(17, 24, 39, 0.04);
+                }
+                .highlight-rank { font-size: 12px; font-weight: 700; color: #1f7a4c; letter-spacing: 0.02em; }
+                .highlight-title { font-weight: 700; font-size: 16px; margin: 4px 0; color: #0f2918; }
+                .highlight-desc { margin: 0; color: #274231; font-size: 14px; }
+                .analysis-block p { margin: 0 0 10px 0; }
+                .analysis-block h3 { margin: 14px 0 6px; }
+                @media print {
+                    body { background: #fff; }
+                    .page { margin: 0; padding: 0 18px; }
+                    .pdf-btn { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="page">
+                <div class="hero">
+                    <div class="hero-content">
+                        <div class="hero-info">
+                            <h1>📍 동흥주유소</h1>
+                            <p>대구광역시 달성군 비슬로566 (현풍면)</p>
+                        </div>
+                        <button class="pdf-btn" onclick="printReport()"> PDF 출력</button>
+                    </div>
+                </div>
 
-
-<!DOCTYPE html>
-<html lang="ko">
-
-<head>
-  <meta charset="utf-8">
-  <title>주식회사 대양씨앤씨 경복궁주유소 입지 분석 보고서</title>
-  <style>
-    :root {
-      --bg: #ecf4ee;
-      --card: #ffffff;
-      --accent: #2fb36f;
-      --accent-2: #1f9255;
-      --text: #10291a;
-      --muted: #5f7263;
-      --border: #d9e7dc;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Noto Sans KR', 'Pretendard', Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      background: radial-gradient(circle at 20% 20%, rgba(47, 179, 111, 0.10), transparent 32%),
-        radial-gradient(circle at 80% 0%, rgba(31, 146, 85, 0.08), transparent 32%),
-        var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-    }
-
-    .page {
-      max-width: 1180px;
-      margin: 32px auto;
-      padding: 8px 18px 42px;
-    }
-
-    .hero {
-      background: linear-gradient(135deg, #2fb36f, #1f9255);
-      color: white;
-      border-radius: 18px;
-      padding: 28px 32px;
-      box-shadow: 0 18px 40px rgba(31, 146, 85, 0.30);
-    }
-
-    .hero h1 {
-      margin: 0 0 6px 0;
-      font-size: 30px;
-    }
-
-    .hero p {
-      margin: 0;
-      color: rgba(255, 255, 255, 0.9);
-    }
-
-    .section {
-      margin-top: 20px;
-    }
-
-    .section-title {
-      font-size: 19px;
-      margin-bottom: 12px;
-      color: #0f172a;
-      letter-spacing: -0.02em;
-    }
-
-    .card {
-      background: var(--card);
-      border-radius: 14px;
-      padding: 18px 20px;
-      box-shadow: 0 12px 30px rgba(17, 24, 39, 0.06);
-      border: 1px solid var(--border);
-    }
-
-    .glass {
-      background: linear-gradient(135deg, rgba(47, 179, 111, 0.08), rgba(31, 146, 85, 0.06));
-      border: 1px solid rgba(255, 255, 255, 0.35);
-    }
-
-    .map-container {
-      height: 520px;
-      border-radius: 14px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-    }
-
-    .map-note {
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .muted {
-      color: var(--muted);
-    }
-
-    .grid {
-      display: grid;
-      gap: 14px;
-    }
-
-    .grid.two {
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    }
-
-    .rec-card {
-      display: grid;
-      grid-template-columns: 62px 1fr;
-      gap: 14px;
-      padding: 14px;
-      border-radius: 12px;
-      background: #f4fbf6;
-      border: 1px solid var(--border);
-    }
-
-    .rec-rank {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #2fb36f, #1f9255);
-      color: white;
-      display: grid;
-      place-items: center;
-      font-weight: 700;
-      font-size: 18px;
-    }
-
-    .rec-title {
-      font-weight: 700;
-      font-size: 17px;
-      color: #0f172a;
-      margin-bottom: 2px;
-    }
-
-    .rec-meta {
-      color: var(--muted);
-      font-size: 13px;
-      margin-bottom: 8px;
-    }
-
-    .rec-desc {
-      color: #27303f;
-      font-size: 14px;
-      margin-bottom: 10px;
-    }
-
-    .rec-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .chip {
-      background: #e6f7ed;
-      color: #1f7a4c;
-      padding: 6px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      border: 1px solid #b2e3c6;
-    }
-
-    .chip.ghost {
-      background: rgba(47, 179, 111, 0.10);
-      color: #1f7a4c;
-      border-color: rgba(47, 179, 111, 0.25);
-    }
-
-    .highlight-wrap {
-      background: linear-gradient(135deg, rgba(47, 179, 111, 0.10), rgba(31, 146, 85, 0.10));
-      border: 1px solid rgba(47, 179, 111, 0.20);
-      border-radius: 14px;
-      padding: 16px;
-    }
-
-    .highlight-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 12px;
-    }
-
-    .highlight-card {
-      background: white;
-      border-radius: 12px;
-      padding: 14px;
-      border: 1px solid var(--border);
-      box-shadow: 0 12px 30px rgba(17, 24, 39, 0.04);
-    }
-
-    .highlight-rank {
-      font-size: 12px;
-      font-weight: 700;
-      color: #1f7a4c;
-      letter-spacing: 0.02em;
-    }
-
-    .highlight-title {
-      font-weight: 700;
-      font-size: 16px;
-      margin: 4px 0;
-      color: #0f2918;
-    }
-
-    .highlight-desc {
-      margin: 0;
-      color: #274231;
-      font-size: 14px;
-    }
-
-    .analysis-block p {
-      margin: 0 0 10px 0;
-    }
-
-    .analysis-block h3 {
-      margin: 14px 0 6px;
-    }
-  </style>
-</head>
-
-<body>
-  <div class="page">
-    <div class="hero">
-      <h1>📍 주식회사 대양씨앤씨 경복궁주유소</h1>
-      <p>서울특별시 종로구 율곡로6 (중학동)</p>
-    </div>
-
-    <div class="section grid two">
-      <div class="card">
-        <div class="section-title">🗺️ 위치 및 필지 지도</div>
-        <div class="map-container">
-          <div style="width:100%;">
-            <div style="position:relative;width:100%;height:0;padding-bottom:60%;"><span style="color:#565656">Make this
-                Notebook Trusted to load map: File -> Trust Notebook</span><iframe srcdoc="&lt;!DOCTYPE html&gt;
+                <div class="section grid two">
+                    <div class="card">
+                        <div class="section-title">🗺️ 위치 및 필지 지도</div>
+                        <div class="map-container"><div style="width:100%;"><div style="position:relative;width:100%;height:0;padding-bottom:60%;"><span style="color:#565656">Make this Notebook Trusted to load map: File -> Trust Notebook</span><iframe srcdoc="&lt;!DOCTYPE html&gt;
 &lt;html&gt;
 &lt;head&gt;
     
@@ -252,7 +203,7 @@
             &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no&quot; /&gt;
             &lt;style&gt;
-                #map_835b1023a240a1025606e9c4f9d7720e {
+                #map_f5495a9fc0a84bd1fda1b05096671396 {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -308,16 +259,16 @@
         &lt;/div&gt;
         
     
-            &lt;div class=&quot;folium-map&quot; id=&quot;map_835b1023a240a1025606e9c4f9d7720e&quot; &gt;&lt;/div&gt;
+            &lt;div class=&quot;folium-map&quot; id=&quot;map_f5495a9fc0a84bd1fda1b05096671396&quot; &gt;&lt;/div&gt;
         
 &lt;/body&gt;
 &lt;script&gt;
     
     
-            var map_835b1023a240a1025606e9c4f9d7720e = L.map(
-                &quot;map_835b1023a240a1025606e9c4f9d7720e&quot;,
+            var map_f5495a9fc0a84bd1fda1b05096671396 = L.map(
+                &quot;map_f5495a9fc0a84bd1fda1b05096671396&quot;,
                 {
-                    center: [37.575457, 126.980522],
+                    center: [35.689819, 128.445642],
                     crs: L.CRS.EPSG3857,
                     ...{
   &quot;zoom&quot;: 17,
@@ -332,7 +283,7 @@
 
         
     
-            var tile_layer_d66d598c5bb84462115c5664d11a4f06 = L.tileLayer(
+            var tile_layer_b892c731a1798dcba98508365efefd8f = L.tileLayer(
                 &quot;https://tile.openstreetmap.org/{z}/{x}/{y}.png&quot;,
                 {
   &quot;minZoom&quot;: 0,
@@ -349,17 +300,17 @@
             );
         
     
-            tile_layer_d66d598c5bb84462115c5664d11a4f06.addTo(map_835b1023a240a1025606e9c4f9d7720e);
+            tile_layer_b892c731a1798dcba98508365efefd8f.addTo(map_f5495a9fc0a84bd1fda1b05096671396);
         
     
-            var marker_afe29e30fc29b8f5e356a93fac98c1bb = L.marker(
-                [37.575457, 126.980522],
+            var marker_77d503668268830e5902717655805276 = L.marker(
+                [35.689819, 128.445642],
                 {
 }
-            ).addTo(map_835b1023a240a1025606e9c4f9d7720e);
+            ).addTo(map_f5495a9fc0a84bd1fda1b05096671396);
         
     
-            var icon_2c2f5843221d2ce3fd46bf1eeaf3fb34 = L.AwesomeMarkers.icon(
+            var icon_a64d1ddf49710c217e3bc424d2c9aec9 = L.AwesomeMarkers.icon(
                 {
   &quot;markerColor&quot;: &quot;red&quot;,
   &quot;iconColor&quot;: &quot;white&quot;,
@@ -370,27 +321,27 @@
             );
         
     
-        var popup_5dcbd1b51145b68878db7611b4ede1d7 = L.popup({
+        var popup_18d467220f5befb2dda45ecac7f7ff47 = L.popup({
   &quot;maxWidth&quot;: 320,
   &quot;minWidth&quot;: 220,
 });
 
         
             
-                var html_08afe892cf40be0d2f8d25b25f31d45a = $(`&lt;div id=&quot;html_08afe892cf40be0d2f8d25b25f31d45a&quot; style=&quot;width: 100.0%; height: 100.0%;&quot;&gt;         &lt;div style=&#x27;white-space: normal; width: 260px; line-height: 1.4;&#x27;&gt;             &lt;div style=&#x27;font-weight: 600; margin-bottom: 4px;&#x27;&gt;주식회사 대양씨앤씨 경복궁주유소&lt;/div&gt;             &lt;div&gt;서울특별시 종로구 율곡로6 (중학동)&lt;/div&gt;         &lt;/div&gt;         &lt;/div&gt;`)[0];
-                popup_5dcbd1b51145b68878db7611b4ede1d7.setContent(html_08afe892cf40be0d2f8d25b25f31d45a);
+                var html_aad4bef230db2eb67386a6a5637cbc75 = $(`&lt;div id=&quot;html_aad4bef230db2eb67386a6a5637cbc75&quot; style=&quot;width: 100.0%; height: 100.0%;&quot;&gt;         &lt;div style=&#x27;white-space: normal; width: 260px; line-height: 1.4;&#x27;&gt;             &lt;div style=&#x27;font-weight: 600; margin-bottom: 4px;&#x27;&gt;동흥주유소&lt;/div&gt;             &lt;div&gt;대구광역시 달성군 비슬로566 (현풍면)&lt;/div&gt;         &lt;/div&gt;         &lt;/div&gt;`)[0];
+                popup_18d467220f5befb2dda45ecac7f7ff47.setContent(html_aad4bef230db2eb67386a6a5637cbc75);
             
         
 
-        marker_afe29e30fc29b8f5e356a93fac98c1bb.bindPopup(popup_5dcbd1b51145b68878db7611b4ede1d7)
+        marker_77d503668268830e5902717655805276.bindPopup(popup_18d467220f5befb2dda45ecac7f7ff47)
         ;
 
         
     
     
-            marker_afe29e30fc29b8f5e356a93fac98c1bb.bindTooltip(
+            marker_77d503668268830e5902717655805276.bindTooltip(
                 `&lt;div&gt;
-                     주식회사 대양씨앤씨 경복궁주유소
+                     동흥주유소
                  &lt;/div&gt;`,
                 {
   &quot;sticky&quot;: true,
@@ -398,146 +349,125 @@
             );
         
     
-                marker_afe29e30fc29b8f5e356a93fac98c1bb.setIcon(icon_2c2f5843221d2ce3fd46bf1eeaf3fb34);
+                marker_77d503668268830e5902717655805276.setIcon(icon_a64d1ddf49710c217e3bc424d2c9aec9);
             
     
-            var circle_c1be8a6971007891ade3b99a30e1fe89 = L.circle(
-                [37.575457, 126.980522],
+            var circle_27c34f58d7b055fd816fdad82425be99 = L.circle(
+                [35.689819, 128.445642],
                 {&quot;bubblingMouseEvents&quot;: true, &quot;color&quot;: &quot;red&quot;, &quot;dashArray&quot;: null, &quot;dashOffset&quot;: null, &quot;fill&quot;: true, &quot;fillColor&quot;: &quot;red&quot;, &quot;fillOpacity&quot;: 0.1, &quot;fillRule&quot;: &quot;evenodd&quot;, &quot;lineCap&quot;: &quot;round&quot;, &quot;lineJoin&quot;: &quot;round&quot;, &quot;opacity&quot;: 1.0, &quot;radius&quot;: 300, &quot;stroke&quot;: true, &quot;weight&quot;: 3}
-            ).addTo(map_835b1023a240a1025606e9c4f9d7720e);
+            ).addTo(map_f5495a9fc0a84bd1fda1b05096671396);
         
     
-        var popup_9a48aba52746060ab36a315551fd51f1 = L.popup({
+        var popup_6f8cf397e59e413d04f3dfc03d142b26 = L.popup({
   &quot;maxWidth&quot;: &quot;100%&quot;,
 });
 
         
             
-                var html_84cd211e10d6cf43571ef19bd7d4fabc = $(`&lt;div id=&quot;html_84cd211e10d6cf43571ef19bd7d4fabc&quot; style=&quot;width: 100.0%; height: 100.0%;&quot;&gt;반경 300m&lt;/div&gt;`)[0];
-                popup_9a48aba52746060ab36a315551fd51f1.setContent(html_84cd211e10d6cf43571ef19bd7d4fabc);
+                var html_05367ef80fb18fbbabd65db5be1b32d4 = $(`&lt;div id=&quot;html_05367ef80fb18fbbabd65db5be1b32d4&quot; style=&quot;width: 100.0%; height: 100.0%;&quot;&gt;반경 300m&lt;/div&gt;`)[0];
+                popup_6f8cf397e59e413d04f3dfc03d142b26.setContent(html_05367ef80fb18fbbabd65db5be1b32d4);
             
         
 
-        circle_c1be8a6971007891ade3b99a30e1fe89.bindPopup(popup_9a48aba52746060ab36a315551fd51f1)
+        circle_27c34f58d7b055fd816fdad82425be99.bindPopup(popup_6f8cf397e59e413d04f3dfc03d142b26)
         ;
 
         
     
 &lt;/script&gt;
-&lt;/html&gt;" style="position:absolute;width:100%;height:100%;left:0;top:0;border:none !important;" allowfullscreen
-                webkitallowfullscreen mozallowfullscreen></iframe></div>
-          </div>
-        </div>
-        <p class="map-note">
-          색상은 필지 크기를 나타내며, 붉은 원은 반경 300m 범위를 의미합니다.
-        </p>
-      </div>
+&lt;/html&gt;" style="position:absolute;width:100%;height:100%;left:0;top:0;border:none !important;" allowfullscreen webkitallowfullscreen mozallowfullscreen></iframe></div></div></div>
+                        <p class="map-note">
+                            색상은 필지 크기를 나타내며, 붉은 원은 반경 300m 범위를 의미합니다.
+                        </p>
+                    </div>
 
-      <div class="card glass analysis-block">
-        <div class="section-title">🤖 LLM 기반 분석 요약</div>
-        <p style="line-height: 1.6;">주식회사 대양씨앤씨 경복궁주유소는 서울특별시 종로구에 위치하여 교통 접근성이 우수한 입지 특성을 보유하고 있습니다. 주변 환경을 고려할 때, 다양한
-          상업 및 숙박시설로의 전환 가능성이 높습니다.</p>
-        <div>
-          <h3 style="margin-bottom: 8px; color: #2c3e50;">핵심 인사이트</h3>
-          <ul style="padding-left: 20px; margin-top: 0;">
-            <li style="margin-bottom: 6px;">주유소의 위치는 관광지와 가까워 숙박시설로의 활용 가능성이 높습니다.</li>
-            <li style="margin-bottom: 6px;">주변 인프라가 부족하므로, 새로운 시설 개발 시 지역 사회의 요구를 반영할 필요가 있습니다.</li>
-            <li style="margin-bottom: 6px;">주유소의 기존 시설을 활용하여 근린생활시설로 전환할 경우, 지역 주민의 편의성을 높일 수 있습니다.</li>
-          </ul>
-        </div>
-        <div>
-          <h3 style="margin-bottom: 8px; color: #2c3e50;">권장 실행 항목</h3>
-          <ol style="padding-left: 20px; margin-top: 0;">
-            <li style="margin-bottom: 6px;">숙박시설 개발을 위한 시장 조사 및 타당성 분석을 실시해야 합니다.</li>
-            <li style="margin-bottom: 6px;">주변 주민과의 소통을 통해 필요한 시설에 대한 의견을 수렴하고 반영해야 합니다.</li>
-            <li style="margin-bottom: 6px;">기존 주유소 시설을 활용한 근린생활시설 개발 계획을 수립하고, 관련 인허가 절차를 진행해야 합니다.</li>
-          </ol>
-        </div>
-      </div>
-    </div>
+                    <div class="card glass analysis-block">
+                        <div class="section-title">🤖 LLM 기반 분석 요약</div>
+                        <p style="line-height: 1.6;">동흥주유소(대구광역시 달성군 비슬로566 (현풍면)) 부지에 대한 기초 입지 진단입니다. 주요 용도지역은 '정보 없음'로 파악되며 주변 토지이용과의 연계를 고려해야 합니다.</p><div><h3 style="margin-bottom: 8px; color: #2c3e50;">핵심 인사이트</h3><ul style="padding-left: 20px; margin-top: 0;"><li style="margin-bottom: 6px;">추천 데이터 상 우선 검토가 필요한 용도는 '자동차관련시설' 유형입니다.</li><li style="margin-bottom: 6px;">주변 상권 밀도와 교통 접근성을 정량 분석해 수요 포착 범위를 확장할 필요가 있습니다.</li><li style="margin-bottom: 6px;">지자체 개발계획 및 도시재생 사업과의 연계를 검토해 정책 수혜 가능성을 확보해야 합니다.</li><li style="margin-bottom: 6px;">기존 주유소 설비 전환 시 공사 기간·안전관리·환경영향을 체계적으로 관리할 필요가 있습니다.</li></ul></div><div><h3 style="margin-bottom: 8px; color: #2c3e50;">권장 실행 항목</h3><ol style="padding-left: 20px; margin-top: 0;"><li style="margin-bottom: 6px;">현장 실사를 통해 용도지역·지구단위계획 등 인허가 요건을 세부 확인합니다.</li><li style="margin-bottom: 6px;">추천 활용 방안 대비 수익성·투자비·수요를 시나리오별로 비교 분석합니다.</li><li style="margin-bottom: 6px;">지자체 및 인근 이해관계자와의 협력 방안을 마련해 추진 동력을 확보합니다.</li></ol></div>
+                    </div>
+                </div>
 
-    <div class="section">
-      <div class="section-title">✨ 상위 3개 활용 방안 브리핑</div>
-      <div class="highlight-wrap">
-        <div class="highlight-grid">
+                <div class="section">
+                    <div class="section-title">✨ 상위 3개 활용 방안 브리핑</div>
+                    <div class="highlight-wrap">
+                        <div class="highlight-grid">
+                            
+                <div class="highlight-card">
+                    <div class="highlight-rank">Top 1</div>
+                    <div class="highlight-title">자동차관련시설</div>
+                    <p class="highlight-desc">추천 API 결과 순위 1위</p>
+                    <div class="rec-chips">
+                        <span class="chip ghost">EV 급속·완속 복합 충전소</span><span class="chip ghost">프리미엄 세차·디테일링</span><span class="chip ghost">모빌리티 공유 거점</span>
+                    </div>
+                </div>
+                
+                <div class="highlight-card">
+                    <div class="highlight-rank">Top 2</div>
+                    <div class="highlight-title">판매시설</div>
+                    <p class="highlight-desc">추천 API 결과 순위 2위</p>
+                    <div class="rec-chips">
+                        <span class="chip ghost">편의형 슈퍼마켓</span><span class="chip ghost">지역 특화 리테일</span><span class="chip ghost">팝업 스토어 존</span>
+                    </div>
+                </div>
+                
+                <div class="highlight-card">
+                    <div class="highlight-rank">Top 3</div>
+                    <div class="highlight-title">기타</div>
+                    <p class="highlight-desc">추천 API 결과 순위 3위</p>
+                    <div class="rec-chips">
+                        <span class="chip ghost">지역 커뮤니티 허브</span><span class="chip ghost">생활 편의 복합 공간</span><span class="chip ghost">공공·민간 협력 거점</span>
+                    </div>
+                </div>
+                
+                        </div>
+                    </div>
+                </div>
 
-          <div class="highlight-card">
-            <div class="highlight-rank">Top 1</div>
-            <div class="highlight-title">숙박시설</div>
-            <p class="highlight-desc">추천 API 결과 순위 1위</p>
-            <div class="rec-chips">
-              <span class="chip ghost">스마트 체류형 숙소</span><span class="chip ghost">마이크로 호텔</span><span
-                class="chip ghost">관광·MICE 연계 숙박</span>
+                <div class="section">
+                    <div class="section-title">💡 추천 활용방안 상세</div>
+                    <div class="grid">
+                        
+            <div class="rec-card">
+                <div class="rec-rank">1</div>
+                <div class="rec-body">
+                    <div class="rec-title">자동차관련시설</div>
+                    <div class="rec-desc">추천 API 결과 순위 1위</div>
+                    <div class="rec-chips">
+                        <span class="chip">EV 급속·완속 복합 충전소</span><span class="chip">프리미엄 세차·디테일링</span><span class="chip">모빌리티 공유 거점</span>
+                    </div>
+                </div>
             </div>
-          </div>
-
-          <div class="highlight-card">
-            <div class="highlight-rank">Top 2</div>
-            <div class="highlight-title">공장</div>
-            <p class="highlight-desc">추천 API 결과 순위 2위</p>
-            <div class="rec-chips">
-              <span class="chip ghost">경량 조립·패키징</span><span class="chip ghost">스마트 마이크로 팩토리</span><span
-                class="chip ghost">지역 특화 생산 거점</span>
+            
+            <div class="rec-card">
+                <div class="rec-rank">2</div>
+                <div class="rec-body">
+                    <div class="rec-title">판매시설</div>
+                    <div class="rec-desc">추천 API 결과 순위 2위</div>
+                    <div class="rec-chips">
+                        <span class="chip">편의형 슈퍼마켓</span><span class="chip">지역 특화 리테일</span><span class="chip">팝업 스토어 존</span>
+                    </div>
+                </div>
             </div>
-          </div>
-
-          <div class="highlight-card">
-            <div class="highlight-rank">Top 3</div>
-            <div class="highlight-title">근린생활시설</div>
-            <p class="highlight-desc">추천 API 결과 순위 3위</p>
-            <div class="rec-chips">
-              <span class="chip ghost">카페·베이커리</span><span class="chip ghost">드라이브 스루 매장</span><span
-                class="chip ghost">키즈·펫 프렌들리 커뮤니티</span>
+            
+            <div class="rec-card">
+                <div class="rec-rank">3</div>
+                <div class="rec-body">
+                    <div class="rec-title">기타</div>
+                    <div class="rec-desc">추천 API 결과 순위 3위</div>
+                    <div class="rec-chips">
+                        <span class="chip">지역 커뮤니티 허브</span><span class="chip">생활 편의 복합 공간</span><span class="chip">공공·민간 협력 거점</span>
+                    </div>
+                </div>
             </div>
-          </div>
-
-        </div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-title">💡 추천 활용방안 상세</div>
-      <div class="grid">
-
-        <div class="rec-card">
-          <div class="rec-rank">1</div>
-          <div class="rec-body">
-            <div class="rec-title">숙박시설</div>
-            <div class="rec-desc">추천 API 결과 순위 1위</div>
-            <div class="rec-chips">
-              <span class="chip">스마트 체류형 숙소</span><span class="chip">마이크로 호텔</span><span class="chip">관광·MICE 연계
-                숙박</span>
+            
+                    </div>
+                </div>
             </div>
-          </div>
-        </div>
-
-        <div class="rec-card">
-          <div class="rec-rank">2</div>
-          <div class="rec-body">
-            <div class="rec-title">공장</div>
-            <div class="rec-desc">추천 API 결과 순위 2위</div>
-            <div class="rec-chips">
-              <span class="chip">경량 조립·패키징</span><span class="chip">스마트 마이크로 팩토리</span><span class="chip">지역 특화 생산
-                거점</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="rec-card">
-          <div class="rec-rank">3</div>
-          <div class="rec-body">
-            <div class="rec-title">근린생활시설</div>
-            <div class="rec-desc">추천 API 결과 순위 3위</div>
-            <div class="rec-chips">
-              <span class="chip">카페·베이커리</span><span class="chip">드라이브 스루 매장</span><span class="chip">키즈·펫 프렌들리
-                커뮤니티</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-</body>
-
-</html>
+            <script>
+                function printReport() {
+                    window.print();
+                }
+            </script>
+        </body>
+        </html>
+        

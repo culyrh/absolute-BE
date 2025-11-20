@@ -832,11 +832,36 @@ async def generate_station_report(
                     background: linear-gradient(135deg, #2fb36f, #1f9255);
                     color: white;
                     border-radius: 18px;
-                    padding: 28px 32px;
+                    padding: 24px 32px;
                     box-shadow: 0 18px 40px rgba(31, 146, 85, 0.30);
                 }}
-                .hero h1 {{ margin: 0 0 6px 0; font-size: 30px; }}
-                .hero p {{ margin: 0; color: rgba(255,255,255,0.9); }}
+                .hero-content {{
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 12px;
+                    flex-wrap: wrap;
+                }}
+                .hero-info h1 {{ margin: 0 0 6px 0; font-size: 30px; }}
+                .hero-info p {{ margin: 0; color: rgba(255,255,255,0.9); }}
+                .pdf-btn {{
+                    background: white;
+                    color: #1f7a4c;
+                    border: none;
+                    border-radius: 12px;
+                    padding: 12px 16px;
+                    font-weight: 700;
+                    box-shadow: 0 10px 26px rgba(17, 24, 39, 0.08);
+                    cursor: pointer;
+                    transition: transform 0.1s ease, box-shadow 0.1s ease;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                }}
+                .pdf-btn:hover {{
+                    transform: translateY(-1px);
+                    box-shadow: 0 14px 30px rgba(17, 24, 39, 0.12);
+                }}
                 .section {{ margin-top: 20px; }}
                 .section-title {{
                     font-size: 19px;
@@ -860,6 +885,20 @@ async def generate_station_report(
                     border-radius: 14px;
                     overflow: hidden;
                     border: 1px solid var(--border);
+                }}
+                .map-container figure {{ margin: 0; height: 100%; }}
+                .map-container > div:first-child {{ height: 100%; }}
+                .map-container > div:first-child > div {{
+                    position: relative !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                    padding: 0 !important;
+                }}
+                .map-container iframe {{
+                    width: 100% !important;
+                    height: 100% !important;
+                    border: 0;
+                    display: block;
                 }}
                 .map-note {{ margin-top: 8px; color: var(--muted); font-size: 13px; }}
                 .muted {{ color: var(--muted); }}
@@ -920,13 +959,23 @@ async def generate_station_report(
                 .highlight-desc {{ margin: 0; color: #274231; font-size: 14px; }}
                 .analysis-block p {{ margin: 0 0 10px 0; }}
                 .analysis-block h3 {{ margin: 14px 0 6px; }}
+                @media print {{
+                    body {{ background: #fff; }}
+                    .page {{ margin: 0; padding: 0 18px; }}
+                    .pdf-btn {{ display: none; }}
+                }}
             </style>
         </head>
         <body>
             <div class="page">
                 <div class="hero">
-                    <h1>📍 {name}</h1>
-                    <p>{address}</p>
+                    <div class="hero-content">
+                        <div class="hero-info">
+                            <h1>📍 {name}</h1>
+                            <p>{address}</p>
+                        </div>
+                        <button class="pdf-btn" onclick="printReport()"> PDF 출력</button>
+                    </div>
                 </div>
 
                 <div class="section grid two">
@@ -960,6 +1009,11 @@ async def generate_station_report(
                     </div>
                 </div>
             </div>
+            <script>
+                function printReport() {{
+                    window.print();
+                }}
+            </script>
         </body>
         </html>
         """
