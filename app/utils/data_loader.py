@@ -48,6 +48,17 @@ def load_gas_station_data() -> pd.DataFrame:
         if "위도" not in df.columns and "_Y" in df.columns:
             df = df.rename(columns={"_Y": "위도"})
 
+        # float 변환 시도 (실패해도 전체는 안 죽게)
+        for col in ["위도", "경도"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        # 좌표 없는 행 제거
+        if "위도" in df.columns and "경도" in df.columns:
+            df = df.dropna(subset=["위도", "경도"])
+        else:
+            print("⚠️ 위도/경도 컬럼이 없어 주유소 위치 기반 API가 동작하지 않을 수 있습니다.")
+
         # -----------------------------
         # 3) 주유소만 필터
         # -----------------------------
@@ -86,19 +97,25 @@ def load_gas_station_data() -> pd.DataFrame:
         # -----------------------------
         bjd_path = DATA_DIR / "법정동_코드_전체자료.csv"
         if bjd_path.exists():
-            df_bjd = pd.read_csv(bjd_path, dtype=str)
-            df_bjd["법정동코드"] = df_bjd["법정동코드"].apply(normalize_code)
+            try:
+                df_bjd = pd.read_csv(bjd_path, dtype=str)
+                df_bjd["법정동코드"] = df_bjd["법정동코드"].apply(normalize_code)
 
-            df = df.merge(
-                df_bjd[["법정동코드", "법정동명"]],
-                how="left",
-                on="법정동코드"
-            )
+                df = df.merge(
+                    df_bjd[["법정동코드", "법정동명"]],
+                    how="left",
+                    on="법정동코드",
+                )
 
-            df.rename(columns={"법정동명": "행정구역"}, inplace=True)
+                # 이미 행정구역이 있으면 덮어쓰지 않음
+                if "행정구역" not in df.columns:
+                    df = df.rename(columns={"법정동명": "행정구역"})
+            except Exception as e:
+                print(f"⚠️ 법정동 코드 매핑 중 오류: {e}")
         else:
             print("⚠️ 법정동 코드 파일을 찾지 못했습니다. 행정구역 매핑 없이 진행합니다.")
-            df["행정구역"] = ""
+            if "행정구역" not in df.columns:
+                df["행정구역"] = ""
 
         # 결측치 제거
         df["행정구역"] = df["행정구역"].fillna("")
@@ -109,14 +126,6 @@ def load_gas_station_data() -> pd.DataFrame:
         # -----------------------------
         df = df.reset_index(drop=True)
         df["id"] = df.index
-
-        # 7) 위도/경도 float 강제 변환
-        for col in ["위도", "경도"]:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
-
-        # 좌표 없는 행 제거
-        df = df.dropna(subset=["위도", "경도"])
 
         print(f"📊 주유소 데이터 로드 완료: {len(df)}개 행")
         return df

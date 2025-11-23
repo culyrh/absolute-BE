@@ -149,38 +149,46 @@ def normalize_region(region: str) -> str:
 
 def preprocess_gas_station_data(df: pd.DataFrame) -> pd.DataFrame:
     """주유소 데이터 전처리"""
+
     # 컬럼명 찾기
     address_col = find_column_by_keyword(df, ["주소", "소재지"])
-    if not address_col:
-        raise ValueError("주소 컬럼을 찾을 수 없습니다.")
-    
-    name_col = find_column_by_keyword(df, ["상호", "명칭", "field5"])  # field5에 상호명 있음
-    if not name_col:
-        name_col = "상호"  # 기본값 설정
-    
-    # 데이터 복사 (원본 보존)
-    processed_df = df.copy()
-    
-    # 행정구역 - data_loader에서 만든 행정구역이 있으면 덮어쓰지 않음
-    if "행정구역" not in processed_df.columns:
-        processed_df["행정구역"] = processed_df["주소"].apply(extract_admin_region)
-    
-    # 권역 - data_loader에서 만든 권역이 있으면 덮어쓰지 않음
-    if "권역" not in processed_df.columns:
-        processed_df["권역"] = processed_df["주소"].apply(extract_province)
 
-    # 위도/경도 float 변환 (거리계산 위해 필수)
+    # ⚠ 주소 없어도 절대 raise 하지 않음 → recommend/ev/vehicle 날리는 원인 제거
+    if not address_col:
+        print("⚠ preprocess_gas_station_data: 주소 컬럼 없음 → 행정구역/권역 추출 스킵")
+        processed_df = df.copy()
+
+        # data_loader가 만든 행정구역/권역이 없으면 최소값만 채워줌
+        if "행정구역" not in processed_df.columns:
+            processed_df["행정구역"] = ""
+        if "권역" not in processed_df.columns:
+            processed_df["권역"] = ""
+
+        return processed_df
+
+    # 데이터 복사
+    processed_df = df.copy()
+
+    # ⚠ 이미 data_loader가 생성한 행정구역이 있으면 절대 덮어쓰지 말 것
+    if "행정구역" not in processed_df.columns:
+        processed_df["행정구역"] = processed_df[address_col].apply(extract_admin_region)
+
+    # ⚠ 이미 data_loader가 생성한 권역 있으면 절대 덮어쓰지 말 것
+    if "권역" not in processed_df.columns:
+        processed_df["권역"] = processed_df[address_col].apply(extract_province)
+
+    # 위도/경도 float 변환
     for col in ["위도", "경도"]:
         if col in processed_df.columns:
             processed_df[col] = pd.to_numeric(processed_df[col], errors="coerce")
-            
+
     # 결측치 처리
     processed_df.replace([np.inf, -np.inf], np.nan, inplace=True)
-    
-    # 컬럼명 통일
+
+    # 주소 컬럼명을 통일
     if address_col != "주소":
         processed_df.rename(columns={address_col: "주소"}, inplace=True)
-    
+
     return processed_df
 
 
