@@ -27,7 +27,9 @@ app.include_router(stations.router)
 app.include_router(usage_types.router)
 app.include_router(ml_recommend.router)
 
-# CORS 설정
+
+"""
+CORS 설정 - nginx로 교체하여 주석화
 origins = [
     "https://absolute-beryl.vercel.app",
     "https://restation.site",
@@ -43,6 +45,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+"""
 
 # 루트 정보
 @app.get("/")
