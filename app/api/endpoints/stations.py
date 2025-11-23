@@ -692,6 +692,7 @@ async def get_station_stats(
         train_mean = {
             name: float(region_train[tr_col].mean())
             for name, (st_col, tr_col) in FEATURE_COLS.items()
+            if tr_col in region_train.columns   # 컬럼 존재 확인
         }
 
         # -------------------------------------------
@@ -705,6 +706,7 @@ async def get_station_stats(
         relative = {
             name: percent_change(metrics[name], train_mean[name])
             for name in FEATURE_COLS.keys()
+            if name in train_mean   # train_mean에 존재하는 지표만
         }
 
         # -------------------------------------------
@@ -713,14 +715,22 @@ async def get_station_stats(
         def percentile(series, value):
             if value is None:
                 return None
-            arr = series.dropna().values
+            # 문자열 → 숫자 변환 (오류 방지)
+            try:
+                value = float(value)
+            except:
+                return None
+
+            arr = pd.to_numeric(series, errors="coerce").dropna().values
             if len(arr) == 0:
                 return None
+            
             return float((arr < value).mean() * 100)
 
         percentiles = {
             name: percentile(region_train[tr_col], metrics[name])
             for name, (st_col, tr_col) in FEATURE_COLS.items()
+            if name in train_mean   # train_mean에 존재하는 지표만
         }
 
         # -------------------------------------------
