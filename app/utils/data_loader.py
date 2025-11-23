@@ -14,7 +14,7 @@ settings = get_settings()
 def load_gas_station_data() -> pd.DataFrame:
     try:
         file_path = settings.GAS_STATION_FILE
-        df = pd.read_csv(file_path, dtype=str)
+        df = pd.read_csv(file_path)
 
         # strip 해서 공백 제거
         df.columns = df.columns.str.strip()
