@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     postgres_user: Optional[str] = None
     postgres_password: Optional[str] = None
 
+    POSTGRES_DSN: Optional[str] = None
+    
     class Config:
         env_file = ".env"
         extra = "ignore"

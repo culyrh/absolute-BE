@@ -6,13 +6,13 @@ from collections import Counter
 from html import escape
 from typing import Optional, List, Dict, Any
 
+import os
 import traceback
 import pandas as pd
 import folium
 import math
 from fastapi import APIRouter, Depends, Query, HTTPException, Path
-from fastapi.responses import JSONResponse
-from fastapi.responses import HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from shapely.geometry import Point
 
 from app.api.dependencies import get_geo_service, get_report_service
@@ -22,7 +22,13 @@ from app.services.ml_location_recommender import MLLocationRecommender
 from app.services.parcel_service import get_parcel_service
 from app.services.recommend_service import RecommendationService, get_recommendation_service
 from app.services.report_service import LLMReportService
+from app.services.terrain_service import TerrainMapService
 
+from dotenv import load_dotenv
+load_dotenv()
+
+from app.core.config import get_settings
+settings = get_settings()
 
 router = APIRouter(
     prefix="/api/stations",
@@ -725,6 +731,13 @@ async def generate_station_report(
             print(f"지적도 서비스 오류: {parcel_error}")
             nearby_parcels = None
 
+        terrain_png_path = f"/api/stations/{station_id}/terrain"
+
+        terrain_img_html = f"""
+            <img src="{terrain_png_path}"
+                style="width:100%; border-radius:12px; border:1px solid #ccc;">
+        """
+
         llm_report = await report_service.generate_report(
             station,
             combined_recommendations,
@@ -1025,7 +1038,9 @@ async def generate_station_report(
                 <div class="section grid two">
                     <div class="card">
                         <div class="section-title">🗺️ 위치 및 필지 지도</div>
-                        <div class="map-container">{map_html}</div>
+                        <div class="map-container">
+                            {terrain_img_html}
+                        </div>
                         <p class="map-note">
                             색상은 필지 크기를 나타내며, 붉은 원은 반경 300m 범위를 의미합니다.
                         </p>
@@ -1066,58 +1081,89 @@ async def generate_station_report(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/cases", response_model=Dict[str, Any])
-async def get_station_cases():
-    """
-    활용 사례 카드 API
-    
-    폐주유소의 다양한 활용 사례 정보를 카드 형태로 제공합니다.
-    """
+pg_dsn = settings.POSTGRES_DSN
+terrain_service = TerrainMapService(pg_dsn)
+
+@router.get("/{id}/terrain")
+async def get_station_terrain(
+    id: str = Path(...),
+    service: GeoService = Depends(get_geo_service),
+):
+    df = service.data.get("gas_station")
+    if df is None or df.empty:
+        raise HTTPException(status_code=500, detail="station.csv 없음")
+
+    # -----------------------------------------
+    # 1) 좌표 기반 ID → 위도/경도 복원
+    # -----------------------------------------
     try:
-        # 대분류 정보 활용한 활용 사례 카드
-        cases = [
-            {
-                "id": 1,
-                "title": "근린생활시설",
-                "description": "일상생활에 필요한 서비스를 제공하는 시설로 활용",
-                "image_url": "/assets/cases/convenience.jpg"
-            },
-            {
-                "id": 2,
-                "title": "공동주택",
-                "description": "주거 공간으로 재활용하여 주택 공급에 기여",
-                "image_url": "/assets/cases/housing.jpg"
-            },
-            {
-                "id": 3,
-                "title": "자동차관련시설",
-                "description": "전기차 충전소나 정비소로 전환하여 활용",
-                "image_url": "/assets/cases/automotive.jpg"
-            },
-            {
-                "id": 4,
-                "title": "판매시설",
-                "description": "소매점이나 마켓으로 활용하여 지역 상권 활성화",
-                "image_url": "/assets/cases/retail.jpg"
-            },
-            {
-                "id": 5,
-                "title": "업무시설",
-                "description": "코워킹 스페이스나 사무실로 활용",
-                "image_url": "/assets/cases/office.jpg"
-            }
-        ]
-        
-        # 캐싱 헤더 설정 (1일)
-        headers = {"Cache-Control": "public, max-age=86400"}
-        
-        return JSONResponse(
-            content={"count": len(cases), "items": cases},
-            headers=headers
-        )
-    except Exception as e:
-        print(f"활용 사례 카드 API 오류: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"활용 사례 카드 조회 중 오류가 발생했습니다: {str(e)}")
+        lat_part, lng_part = id.split("_")
+        lat = float(lat_part) / 1_000_000
+        lng = float(lng_part) / 1_000_000
+    except:
+        raise HTTPException(status_code=400, detail="ID 형식 오류")
+
+    # -----------------------------------------
+    # 2) 가장 가까운 station 찾기 (report / stats 방식 동일)
+    # -----------------------------------------
+    df = df.loc[:, ~df.columns.duplicated()]
+    df["distance"] = (df["위도"] - lat)**2 + (df["경도"] - lng)**2
+    station = df.loc[df["distance"].idxmin()].to_dict()
+    station.pop("distance", None)
+
+    # -----------------------------------------
+    # 3) terrain 처리
+    # -----------------------------------------
+    lon = station["경도"]
+    lat = station["위도"]
+
+    bbox = terrain_service.compute_bbox_around(lon, lat, meter=500)
+    base_img = terrain_service.fetch_hillshade(bbox, width=768, height=768)
+    parcels = terrain_service.query_parcels(lon, lat, radius=500)
+    final_img = terrain_service.draw_overlay(base_img, bbox, lon, lat, parcels)
+
+    out_dir = "generated_maps"
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, f"{id}_terrain.png")
+    final_img.save(out_path)
+
+    return FileResponse(out_path, media_type="image/png")
+
+
+from fastapi.responses import HTMLResponse
+from app.services.terrain_service import TerrainMapService
+
+@router.get("/{id}/terrain/html", response_class=HTMLResponse)
+async def get_station_terrain_html(
+    id: str = Path(...),
+    service: GeoService = Depends(get_geo_service),
+):
+    """
+    주유소 주변 300m / 500m 필지 + 지목/용도지역 인터랙티브 지도 (HTML)
+    """
+
+    df = service.data.get("gas_station")
+    if df is None or df.empty:
+        raise HTTPException(status_code=500, detail="station.csv 없음")
+
+    # 1) 좌표 기반 ID → 위경도 복원
+    try:
+        lat_part, lng_part = id.split("_")
+        lat = float(lat_part) / 1_000_000
+        lon = float(lng_part) / 1_000_000
+    except:
+        raise HTTPException(status_code=400, detail="ID 형식 오류")
+
+    # 2) 가장 가까운 station 찾기
+    df = df.loc[:, ~df.columns.duplicated()]
+    df["distance"] = (df["위도"] - lat)**2 + (df["경도"] - lon)**2
+    station = df.loc[df["distance"].idxmin()].to_dict()
+    station.pop("distance", None)
+
+    # 3) HTML 생성
+    html = terrain_service.generate_interactive_html(lon=lon, lat=lat, radius=500)
+    return HTMLResponse(content=html)
+
 
 
 @router.get("/{id}", response_model=GasStationResponse)
