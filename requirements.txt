@@ -20,3 +20,4 @@ fiona==1.9.5
 pyproj==3.6.0
 tqdm==4.66.1
 psycopg2-binary==2.9.7
+pillow==10.4.0

@@ -28,9 +28,17 @@ app.include_router(usage_types.router)
 app.include_router(ml_recommend.router)
 
 # CORS 설정
+origins = [
+    "https://absolute-beryl.vercel.app",
+    "https://restation.site",
+    "https://api.restation.site",
+    "http://localhost:5173",
+    "http://localhost:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
