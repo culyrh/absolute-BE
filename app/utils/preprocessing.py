@@ -161,12 +161,19 @@ def preprocess_gas_station_data(df: pd.DataFrame) -> pd.DataFrame:
     # 데이터 복사 (원본 보존)
     processed_df = df.copy()
     
-    # 행정구역 추출
-    processed_df["행정구역"] = processed_df[address_col].apply(extract_admin_region)
+    # 행정구역 - data_loader에서 만든 행정구역이 있으면 덮어쓰지 않음
+    if "행정구역" not in processed_df.columns:
+        processed_df["행정구역"] = processed_df["주소"].apply(extract_admin_region)
     
-    # 권역(도/광역시) 추출
-    processed_df["권역"] = processed_df[address_col].apply(extract_province)
-    
+    # 권역 - data_loader에서 만든 권역이 있으면 덮어쓰지 않음
+    if "권역" not in processed_df.columns:
+        processed_df["권역"] = processed_df["주소"].apply(extract_province)
+
+    # 위도/경도 float 변환 (거리계산 위해 필수)
+    for col in ["위도", "경도"]:
+        if col in processed_df.columns:
+            processed_df[col] = pd.to_numeric(processed_df[col], errors="coerce")
+            
     # 결측치 처리
     processed_df.replace([np.inf, -np.inf], np.nan, inplace=True)
     
