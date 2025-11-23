@@ -429,8 +429,16 @@ async def get_vehicle_services(
     station = df.loc[df["distance"].idxmin()].to_dict()
 
     region = station.get("행정구역")
-    if region is None:
-        raise HTTPException(status_code=500, detail="행정구역 정보 없음")
+    if not region or str(region).strip() == "":
+        return {
+            "id": id,
+            "region": None,
+            "정비소": [],
+            "세차장": [],
+            "타이어": [],
+            "카센터": [],
+            "total_count": 0
+        }
 
     # 3. Kakao keyword 검색
     repair = kakao_local_search(f"정비소 {region}")
@@ -478,8 +486,13 @@ async def get_ev_chargers(
     station = df.loc[df["distance"].idxmin()].to_dict()
 
     region = station.get("행정구역")
-    if region is None:
-        raise HTTPException(status_code=500, detail="행정구역 정보 없음")
+    if not region or str(region).strip() == "":
+        return {
+            "id": id,
+            "region": None,
+            "items": [],
+            "count": 0
+        }
 
     # Kakao keyword 검색
     ev = kakao_local_search(f"전기차충전소 {region}")

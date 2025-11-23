@@ -14,12 +14,14 @@ settings = get_settings()
 def load_gas_station_data() -> pd.DataFrame:
     try:
         file_path = settings.GAS_STATION_FILE
-        df = pd.read_csv(file_path)
+        df = pd.read_csv(file_path, dtype=str)
 
         # strip 해서 공백 제거
         df.columns = df.columns.str.strip()
 
-        # 1) 기본 매핑
+        # -----------------------------
+        # 1) 기본 컬럼 매핑
+        # -----------------------------
         column_mapping = {
             "field1": "년도", 
             "field2": "일자",
@@ -38,19 +40,83 @@ def load_gas_station_data() -> pd.DataFrame:
         }
         df = df.rename(columns=column_mapping)
 
-        # 2) 경도/위도 중복 생성을 방지
-        # station.csv 원본에 이미 경도/위도가 있다면 rename하지 않는다.
+        # -----------------------------
+        # 2) 경도/위도 처리
+        # -----------------------------
         if "경도" not in df.columns and "_X" in df.columns:
             df = df.rename(columns={"_X": "경도"})
         if "위도" not in df.columns and "_Y" in df.columns:
             df = df.rename(columns={"_Y": "위도"})
 
+        # -----------------------------
         # 3) 주유소만 필터
+        # -----------------------------
         df = df[df["업종"] == "주유소"].copy()
 
-        # 4) ID 부여
+        # -----------------------------
+        # 4) 법정동 코드 10자리 정규화 함수
+        # -----------------------------
+        def normalize_code(code):
+            if code is None:
+                return None
+
+            s = str(code).strip()
+
+            if s.endswith(".0"):
+                s = s[:-2]
+
+            s = "".join(c for c in s if c.isdigit())
+
+            if len(s) == 8:
+                s = s + "00"
+
+            if len(s) < 10:
+                s = s.ljust(10, "0")
+
+            return s[:10]
+
+        # 법정동코드 정규화
+        if "법정동코드" in df.columns:
+            df["법정동코드"] = df["법정동코드"].apply(normalize_code)
+        else:
+            df["법정동코드"] = None
+
+        # -----------------------------
+        # 5) 법정동 전체 코드 로드 + 조인
+        # -----------------------------
+        bjd_path = DATA_DIR / "법정동_코드_전체자료.csv"
+        if bjd_path.exists():
+            df_bjd = pd.read_csv(bjd_path, dtype=str)
+            df_bjd["법정동코드"] = df_bjd["법정동코드"].apply(normalize_code)
+
+            df = df.merge(
+                df_bjd[["법정동코드", "법정동명"]],
+                how="left",
+                on="법정동코드"
+            )
+
+            df.rename(columns={"법정동명": "행정구역"}, inplace=True)
+        else:
+            print("⚠️ 법정동 코드 파일을 찾지 못했습니다. 행정구역 매핑 없이 진행합니다.")
+            df["행정구역"] = ""
+
+        # 결측치 제거
+        df["행정구역"] = df["행정구역"].fillna("")
+
+        
+        # -----------------------------
+        # 6) 인덱스 기반 ID 생성
+        # -----------------------------
         df = df.reset_index(drop=True)
         df["id"] = df.index
+
+        # 7) 위도/경도 float 강제 변환
+        for col in ["위도", "경도"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        # 좌표 없는 행 제거
+        df = df.dropna(subset=["위도", "경도"])
 
         print(f"📊 주유소 데이터 로드 완료: {len(df)}개 행")
         return df
