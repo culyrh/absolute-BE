@@ -467,12 +467,15 @@ async def get_vehicle_services(
         raise HTTPException(status_code=400, detail="ID 형식 오류")
 
     # 2) 가장 가까운 station
-    df = df.loc[:, ~df.columns.duplicated()]
     df["distance"] = (df["위도"] - lat)**2 + (df["경도"] - lng)**2
     station = df.loc[df["distance"].idxmin()].to_dict()
 
     # 3) adm_cd2 기반 법정동명 찾기 **(핵심 패치)**
-    adm_raw = station.get("adm_cd2") or station.get("법정동코드")
+    adm_raw = (
+        station.get("adm_cd2") or
+        station.get("법정동코드") or
+        station.get("법정동 코드")  # ← 이거 추가해야 실제 CSV와 맞음
+    )
     region = get_bjd_name_from_adm(adm_raw)
 
     if not region:
@@ -525,12 +528,15 @@ async def get_ev_chargers(
         raise HTTPException(status_code=400, detail="ID 형식 오류")
 
     # 가장 가까운 station
-    df = df.loc[:, ~df.columns.duplicated()]
     df["distance"] = (df["위도"] - lat)**2 + (df["경도"] - lng)**2
     station = df.loc[df["distance"].idxmin()].to_dict()
 
     # adm_cd2 기반 법정동명 찾기 **(핵심 패치)**
-    adm_raw = station.get("adm_cd2") or station.get("법정동코드")
+    adm_raw = (
+        station.get("adm_cd2") or
+        station.get("법정동코드") or
+        station.get("법정동 코드")  # ← 이거 추가해야 실제 CSV와 맞음
+    )
     region = get_bjd_name_from_adm(adm_raw)
 
     if not region:
