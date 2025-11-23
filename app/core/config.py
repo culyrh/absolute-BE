@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     CENTER_FILE: str = str(DATA_DIR / "대분류_센터로이드.csv")
     RECOMMEND_RESULT_FILE: str = str(DATA_DIR / "추천결과_행단위.csv")
     INTEGRATED_DATA_FILE: str = str(DATA_DIR / "train.csv")
+
+    # Kakao REST API 키 추가
+    KAKAO_REST_API_KEY: Optional[str] = None
     
     # CORS
     CORS_ORIGINS: List[str] = ["*"]

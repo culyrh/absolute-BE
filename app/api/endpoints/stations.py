@@ -6,11 +6,13 @@ from collections import Counter
 from html import escape
 from typing import Optional, List, Dict, Any
 
+
 import json
 import traceback
 import pandas as pd
 import folium
 import math
+import requests
 from fastapi import APIRouter, Depends, Query, HTTPException, Path
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from shapely.geometry import Point
@@ -174,6 +176,51 @@ def _summarise_nearby_parcels(gdf, lat: float, lng: float) -> Optional[Dict[str,
         "closest": closest_info,
     }
 
+
+def kakao_local_search(query: str):
+    """
+    Kakao Local API — 반경 검색 없이 query 기반 검색
+    """
+    url = "https://dapi.kakao.com/v2/local/search/keyword.json"
+    headers = {
+        "Authorization": f"KakaoAK {settings.KAKAO_REST_API_KEY}"
+    }
+
+    params = {
+        "query": query,
+        "size": 15
+    }
+
+    r = requests.get(url, headers=headers, params=params)
+
+    if r.status_code != 200:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Kakao API 오류: {r.text}"
+        )
+
+    docs = r.json().get("documents", [])
+    results = []
+
+    for d in docs:
+        try:
+            results.append({
+                "name": d.get("place_name"),
+                "lat": float(d.get("y")),
+                "lng": float(d.get("x")),
+                "address": d.get("address_name"),
+                "road_address": d.get("road_address_name")
+            })
+        except:
+            continue
+
+    return results
+
+
+
+# ============================================================
+# API 엔드포인트
+# ============================================================
 
 @router.get("/region/{code:path}")
 async def get_geojson_by_region(
@@ -350,6 +397,101 @@ async def search_stations(
         raise HTTPException(status_code=500, detail=f"주유소명 기반 검색 중 오류 발생: {str(e)}")
 
 
+
+# ============================================================
+# 주유소 개별 정보 API
+# ============================================================
+
+@router.get("/{id}/vehicle")
+async def get_vehicle_services(
+    id: str = Path(..., description="주유소 좌표 기반 ID"),
+    service: GeoService = Depends(get_geo_service)
+):
+    """
+    자동차 기반시설 (정비소, 세차장, 타이어, 카센터)
+    → 반경 검색 제거하고 행정동 기반으로 검색
+    """
+    df = service.data.get("gas_station")
+    if df is None or df.empty:
+        raise HTTPException(status_code=500, detail="station.csv 없음")
+
+    # 1. 위경도 추출
+    try:
+        lat_part, lng_part = id.split("_")
+        lat = float(lat_part) / 1_000_000
+        lng = float(lng_part) / 1_000_000
+    except:
+        raise HTTPException(status_code=400, detail="ID 형식 오류")
+
+    # 2. station 행정구역 추출
+    df = df.loc[:, ~df.columns.duplicated()]
+    df["distance"] = (df["위도"] - lat)**2 + (df["경도"] - lng)**2
+    station = df.loc[df["distance"].idxmin()].to_dict()
+
+    region = station.get("행정구역")
+    if region is None:
+        raise HTTPException(status_code=500, detail="행정구역 정보 없음")
+
+    # 3. Kakao keyword 검색
+    repair = kakao_local_search(f"정비소 {region}")
+    wash   = kakao_local_search(f"세차장 {region}")
+    tire   = kakao_local_search(f"타이어 {region}")
+    center = kakao_local_search(f"카센터 {region}")
+
+    total = len(repair) + len(wash) + len(tire) + len(center)
+
+    return {
+        "id": id,
+        "region": region,
+        "정비소": repair,
+        "세차장": wash,
+        "타이어": tire,
+        "카센터": center,
+        "total_count": total
+    }
+
+
+@router.get("/{id}/ev")
+async def get_ev_chargers(
+    id: str = Path(..., description="주유소 좌표 기반 ID"),
+    service: GeoService = Depends(get_geo_service)
+):
+    """
+    EV 충전소 (전기차충전소)
+    → 반경 검색 제거하고 행정동 기반으로 검색
+    """
+    df = service.data.get("gas_station")
+    if df is None or df.empty:
+        raise HTTPException(status_code=500, detail="station.csv 없음")
+
+    # ID → 좌표 변환
+    try:
+        lat_part, lng_part = id.split("_")
+        lat = float(lat_part) / 1_000_000
+        lng = float(lng_part) / 1_000_000
+    except:
+        raise HTTPException(status_code=400, detail="ID 형식 오류")
+
+    # station 찾기
+    df = df.loc[:, ~df.columns.duplicated()]
+    df["distance"] = (df["위도"] - lat)**2 + (df["경도"] - lng)**2
+    station = df.loc[df["distance"].idxmin()].to_dict()
+
+    region = station.get("행정구역")
+    if region is None:
+        raise HTTPException(status_code=500, detail="행정구역 정보 없음")
+
+    # Kakao keyword 검색
+    ev = kakao_local_search(f"전기차충전소 {region}")
+
+    return {
+        "id": id,
+        "region": region,
+        "items": ev,
+        "count": len(ev)
+    }
+
+
 @router.get("/{id}/recommend")
 async def get_station_recommend(
     id: str = Path(..., description="좌표 기반 고유 ID (예: 35689819_128445642)"),
@@ -440,8 +582,18 @@ async def get_station_stats(
                 adm_raw = station.get(key)
                 break
 
-        if adm_raw is None:
-            raise HTTPException(status_code=500, detail="station adm_cd2 없음")
+        # 수정: adm_cd2 없으면 에러 내지 말고 빈 값 반환
+        if adm_raw is None or str(adm_raw).strip() == "" or str(adm_raw).lower() == "nan":
+            return JSONResponse(
+                content={
+                    "id": id,
+                    "region_code": None,
+                    "metrics": {},
+                    "train_mean": {},
+                    "relative": {},
+                    "percentile": {}
+                }
+            )
 
         # -------------------------------------------
         # 4-B) adm_cd2 정규화 함수
@@ -1041,6 +1193,11 @@ async def generate_station_report(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+# ============================================================
+# 주유소 지형도 API
+# ============================================================
+
 pg_dsn = settings.POSTGRES_DSN
 terrain_service = TerrainMapService(pg_dsn)
 
@@ -1180,4 +1337,3 @@ async def get_station_detail(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"상세 조회 오류: {str(e)}")
-
