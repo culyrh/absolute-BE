@@ -23,6 +23,8 @@ from app.services.geo_service import GeoService
 from app.services.parcel_service import get_parcel_service
 from app.services.report_service import LLMReportService
 from app.services.terrain_service import TerrainMapService
+from app.core.config import DATA_DIR
+
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -194,10 +196,7 @@ def kakao_local_search(query: str):
     r = requests.get(url, headers=headers, params=params)
 
     if r.status_code != 200:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Kakao API 오류: {r.text}"
-        )
+        return []
 
     docs = r.json().get("documents", [])
     results = []
@@ -402,20 +401,64 @@ async def search_stations(
 # 주유소 개별 정보 API
 # ============================================================
 
+BJD_PATH = DATA_DIR / "법정동_코드_전체자료.csv"
+BJD_DF = None
+
+def load_bjd_df():
+    global BJD_DF
+    if BJD_DF is not None:
+        return BJD_DF
+
+    df = pd.read_csv(BJD_PATH, dtype=str)
+
+    def norm(code):
+        s = str(code).strip()
+        if s.endswith(".0"):
+            s = s[:-2]
+        s = "".join(c for c in s if c.isdigit())
+        if len(s) == 8:
+            s += "00"
+        if len(s) < 10:
+            s = s.ljust(10, "0")
+        return s[:10]
+
+    df["법정동코드"] = df["법정동코드"].apply(norm)
+    BJD_DF = df
+    return df
+
+def get_bjd_name_from_adm(adm_cd2):
+    """adm_cd2 → 정규화 → 법정동명 반환"""
+    if adm_cd2 is None:
+        return None
+
+    df = load_bjd_df()
+
+    s = str(adm_cd2).strip()
+    if s.endswith(".0"):
+        s = s[:-2]
+    s = "".join(c for c in s if c.isdigit())
+    if len(s) == 8:
+        s += "00"
+    if len(s) < 10:
+        s = s.ljust(10, "0")
+    s = s[:10]
+
+    row = df[df["법정동코드"] == s]
+    if len(row) == 0:
+        return None
+
+    return row["법정동명"].iloc[0]
+
 @router.get("/{id}/vehicle")
 async def get_vehicle_services(
-    id: str = Path(..., description="주유소 좌표 기반 ID"),
+    id: str = Path(..., description="좌표 기반 고유 ID"),
     service: GeoService = Depends(get_geo_service)
 ):
-    """
-    자동차 기반시설 (정비소, 세차장, 타이어, 카센터)
-    → 반경 검색 제거하고 행정동 기반으로 검색
-    """
     df = service.data.get("gas_station")
     if df is None or df.empty:
         raise HTTPException(status_code=500, detail="station.csv 없음")
 
-    # 1. 위경도 추출
+    # 1) ID → 좌표 복구
     try:
         lat_part, lng_part = id.split("_")
         lat = float(lat_part) / 1_000_000
@@ -423,13 +466,16 @@ async def get_vehicle_services(
     except:
         raise HTTPException(status_code=400, detail="ID 형식 오류")
 
-    # 2. station 행정구역 추출
+    # 2) 가장 가까운 station
     df = df.loc[:, ~df.columns.duplicated()]
     df["distance"] = (df["위도"] - lat)**2 + (df["경도"] - lng)**2
     station = df.loc[df["distance"].idxmin()].to_dict()
 
-    region = station.get("행정구역")
-    if not region or str(region).strip() == "":
+    # 3) adm_cd2 기반 법정동명 찾기 **(핵심 패치)**
+    adm_raw = station.get("adm_cd2") or station.get("법정동코드")
+    region = get_bjd_name_from_adm(adm_raw)
+
+    if not region:
         return {
             "id": id,
             "region": None,
@@ -440,7 +486,7 @@ async def get_vehicle_services(
             "total_count": 0
         }
 
-    # 3. Kakao keyword 검색
+    # 4) Kakao 검색
     repair = kakao_local_search(f"정비소 {region}")
     wash   = kakao_local_search(f"세차장 {region}")
     tire   = kakao_local_search(f"타이어 {region}")
@@ -459,20 +505,18 @@ async def get_vehicle_services(
     }
 
 
+# ============================================================
+
 @router.get("/{id}/ev")
 async def get_ev_chargers(
-    id: str = Path(..., description="주유소 좌표 기반 ID"),
+    id: str = Path(..., description="좌표 기반 고유 ID"),
     service: GeoService = Depends(get_geo_service)
 ):
-    """
-    EV 충전소 (전기차충전소)
-    → 반경 검색 제거하고 행정동 기반으로 검색
-    """
     df = service.data.get("gas_station")
     if df is None or df.empty:
         raise HTTPException(status_code=500, detail="station.csv 없음")
 
-    # ID → 좌표 변환
+    # ID → 좌표 복구
     try:
         lat_part, lng_part = id.split("_")
         lat = float(lat_part) / 1_000_000
@@ -480,22 +524,20 @@ async def get_ev_chargers(
     except:
         raise HTTPException(status_code=400, detail="ID 형식 오류")
 
-    # station 찾기
+    # 가장 가까운 station
     df = df.loc[:, ~df.columns.duplicated()]
     df["distance"] = (df["위도"] - lat)**2 + (df["경도"] - lng)**2
     station = df.loc[df["distance"].idxmin()].to_dict()
 
-    region = station.get("행정구역")
-    if not region or str(region).strip() == "":
-        return {
-            "id": id,
-            "region": None,
-            "items": [],
-            "count": 0
-        }
+    # adm_cd2 기반 법정동명 찾기 **(핵심 패치)**
+    adm_raw = station.get("adm_cd2") or station.get("법정동코드")
+    region = get_bjd_name_from_adm(adm_raw)
 
-    # Kakao keyword 검색
-    ev = kakao_local_search(f"전기차충전소 {region}")
+    if not region:
+        return {"id": id, "region": None, "items": [], "count": 0}
+
+    # Kakao 검색
+    ev = kakao_local_search(f"전기차충전소 {region}") or []
 
     return {
         "id": id,
