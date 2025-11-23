@@ -6,7 +6,7 @@ from collections import Counter
 from html import escape
 from typing import Optional, List, Dict, Any
 
-import os
+import json
 import traceback
 import pandas as pd
 import folium
@@ -18,9 +18,7 @@ from shapely.geometry import Point
 from app.api.dependencies import get_geo_service, get_report_service
 from app.schemas.gas_station import GasStationList, GasStationResponse
 from app.services.geo_service import GeoService
-from app.services.ml_location_recommender import MLLocationRecommender
 from app.services.parcel_service import get_parcel_service
-from app.services.recommend_service import RecommendationService, get_recommendation_service
 from app.services.report_service import LLMReportService
 from app.services.terrain_service import TerrainMapService
 
@@ -68,90 +66,6 @@ def _extract_land_use(row: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _extract_ml_recommendations(station: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """station 데이터에 포함된 recommend1~3 컬럼을 표준 추천 포맷으로 변환한다."""
-
-    recommendations: List[Dict[str, Any]] = []
-    for rank in range(1, 4):
-        value = station.get(f"recommend{rank}")
-        if value is None:
-            continue
-
-        text = str(value).strip()
-        if not text or text.lower() == "nan":
-            continue
-
-        recommendations.append({
-            "type": text,
-            "rank": rank,
-            "source": "ml_recommend",
-            "description": f"ML 기반 추천 순위 {rank}위",
-        })
-
-    return recommendations
-
-
-_ml_recommender: Optional[MLLocationRecommender] = None
-
-
-def _get_ml_recommender() -> Optional[MLLocationRecommender]:
-    global _ml_recommender
-
-    if _ml_recommender is not None:
-        return _ml_recommender
-
-    try:
-        instance = MLLocationRecommender()
-        instance.train()
-        _ml_recommender = instance
-        return _ml_recommender
-    except Exception as exc:
-        print(f"MLLocationRecommender 초기화 실패: {exc}")
-        return None
-
-
-def _live_ml_recommendations(station: Dict[str, Any], top_n: int = 3) -> List[Dict[str, Any]]:
-    """실시간 ML 추천(top-N)을 호출해 표준 포맷으로 반환한다."""
-
-    recommender = _get_ml_recommender()
-    if recommender is None:
-        return []
-
-    keyword = (
-        station.get("상호")
-        or station.get("상호명")
-        or station.get("업체명")
-        or station.get("주소")
-        or station.get("지번주소")
-    )
-    if not keyword:
-        return []
-
-    try:
-        result = recommender.recommend_for_station(str(keyword), top_n=top_n)
-    except Exception as exc:
-        print(f"실시간 ML 추천 실패: {exc}")
-        return []
-
-    items = result.get("results") or []
-    formatted: List[Dict[str, Any]] = []
-    for item in items:
-        category = item.get("category")
-        if not category:
-            continue
-        formatted.append(
-            {
-                "type": category,
-                "rank": item.get("rank"),
-                "probability": item.get("probability"),
-                "source": "ml_recommend",
-                "description": f"ML 기반 추천 순위 {item.get('rank')}위",
-            }
-        )
-
-    return formatted
-
-
 USAGE_EXAMPLES: Dict[str, List[str]] = {
     "가설건축": ["모듈러 임시 판매존", "이벤트·전시 팝업", "가변형 임대 공간"],
     "공동주택": ["도심형 소형 주택", "코리빙 레지던스", "청년 주거 특화"],
@@ -172,29 +86,33 @@ def _usage_examples(usage_type: str) -> List[str]:
     return ["복합 커뮤니티 라운지", "지역 맞춤형 서비스 존", "공공·민간 협력형 파일럿"]
 
 
-def _merge_recommendations(primary: List[Dict[str, Any]], secondary: List[Dict[str, Any]], limit: int = 5) -> List[Dict[str, Any]]:
-    """추천 항목을 용도명 기준으로 병합한다."""
+def _format_recommendations_from_api_payload(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """/{id}/recommend API 응답을 보고서에서 사용하는 포맷으로 변환한다."""
 
-    merged: List[Dict[str, Any]] = []
-    seen: set[str] = set()
+    if not isinstance(payload, dict):
+        return []
 
-    for source_list in (primary, secondary):
-        for item in source_list:
-            usage = item.get("type") or item.get("usage_type") or item.get("category")
-            if not usage:
-                continue
+    formatted: List[Dict[str, Any]] = []
+    for rank in range(1, 6):
+        key = f"recommend{rank}"
+        usage_value = payload.get(key)
+        if usage_value is None:
+            continue
 
-            usage_key = str(usage).strip()
-            if not usage_key or usage_key.lower() == "nan" or usage_key in seen:
-                continue
+        usage_text = str(usage_value).strip()
+        if not usage_text or usage_text.lower() == "nan":
+            continue
 
-            merged.append(item)
-            seen.add(usage_key)
+        formatted.append(
+            {
+                "type": usage_text,
+                "rank": rank,
+                "source": "station_recommend_api",
+                "description": f"추천 API 결과 순위 {rank}위",
+            }
+        )
 
-            if len(merged) >= limit:
-                return merged
-
-    return merged
+    return formatted
 
 
 def _summarise_nearby_parcels(gdf, lat: float, lng: float) -> Optional[Dict[str, Any]]:
@@ -662,7 +580,6 @@ async def get_station_stats(
 async def generate_station_report(
     id: str = Path(..., description="좌표 기반 고유 ID (예: 35689819_128445642)"),
     service: GeoService = Depends(get_geo_service),
-    recommend_service: RecommendationService = Depends(get_recommendation_service),
     report_service: LLMReportService = Depends(get_report_service)
 ):
     """
@@ -705,18 +622,15 @@ async def generate_station_report(
         name = station.get('상호', '주유소')
         address = station.get('주소', '')
 
-        # 2. 추천 결과 (ML recommend1~3 + 서비스 추천 병합)
+        # 2. 추천 결과 (/{id}/recommend API 활용)
+        combined_recommendations: List[Dict[str, Any]] = []
         try:
-            recommendations = recommend_service.recommend_by_query(address, top_k=5)
-            rec_items = recommendations.get('items', [])
+            recommend_response = await get_station_recommend(id=id, service=service)
+            raw_body = getattr(recommend_response, "body", b"")
+            payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+            combined_recommendations = _format_recommendations_from_api_payload(payload)
         except Exception as rec_error:
-            print(f"추천 서비스 오류: {rec_error}")
-            rec_items = []
-
-        live_ml_rec_items = _live_ml_recommendations(station, top_n=3)
-        static_ml_rec_items = _extract_ml_recommendations(station)
-        primary_recs = live_ml_rec_items or static_ml_rec_items
-        combined_recommendations = _merge_recommendations(primary_recs, rec_items, limit=5)
+            print(f"추천 API 호출 오류: {rec_error}")
 
         parcel_summary = None
 
@@ -863,21 +777,13 @@ async def generate_station_report(
         highlight_cards = ""
 
         for i, item in enumerate(combined_recommendations[:5], 1):
-            score = item.get('score') or item.get('probability') or item.get('similarity')
-            try:
-                score_display = f"{float(score):.3f}" if score is not None else "-"
-            except (TypeError, ValueError):
-                score_display = str(score)
-
-            description = item.get('description', '')
+            description = item.get('description') or '추천 결과를 검토해 보세요.'
             item_type = item.get('type', item.get('usage_type', item.get('category', '제안 항목')))
-            source = item.get('source', '추천')
             recommendations_html += f"""
             <div class=\"rec-card\">
                 <div class=\"rec-rank\">{i}</div>
                 <div class=\"rec-body\">
                     <div class=\"rec-title\">{item_type}</div>
-                    <div class=\"rec-meta\">사용한 알고리즘: {source} · 점수/확률: {score_display}</div>
                     <div class=\"rec-desc\">{description or '요약 정보가 추가될 예정입니다.'}</div>
                     <div class=\"rec-chips\">
                         {''.join(f'<span class="chip">{ex}</span>' for ex in _usage_examples(str(item_type)))}
@@ -938,11 +844,36 @@ async def generate_station_report(
                     background: linear-gradient(135deg, #2fb36f, #1f9255);
                     color: white;
                     border-radius: 18px;
-                    padding: 28px 32px;
+                    padding: 24px 32px;
                     box-shadow: 0 18px 40px rgba(31, 146, 85, 0.30);
                 }}
-                .hero h1 {{ margin: 0 0 6px 0; font-size: 30px; }}
-                .hero p {{ margin: 0; color: rgba(255,255,255,0.9); }}
+                .hero-content {{
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 12px;
+                    flex-wrap: wrap;
+                }}
+                .hero-info h1 {{ margin: 0 0 6px 0; font-size: 30px; }}
+                .hero-info p {{ margin: 0; color: rgba(255,255,255,0.9); }}
+                .pdf-btn {{
+                    background: white;
+                    color: #1f7a4c;
+                    border: none;
+                    border-radius: 12px;
+                    padding: 12px 16px;
+                    font-weight: 700;
+                    box-shadow: 0 10px 26px rgba(17, 24, 39, 0.08);
+                    cursor: pointer;
+                    transition: transform 0.1s ease, box-shadow 0.1s ease;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                }}
+                .pdf-btn:hover {{
+                    transform: translateY(-1px);
+                    box-shadow: 0 14px 30px rgba(17, 24, 39, 0.12);
+                }}
                 .section {{ margin-top: 20px; }}
                 .section-title {{
                     font-size: 19px;
@@ -966,6 +897,20 @@ async def generate_station_report(
                     border-radius: 14px;
                     overflow: hidden;
                     border: 1px solid var(--border);
+                }}
+                .map-container figure {{ margin: 0; height: 100%; }}
+                .map-container > div:first-child {{ height: 100%; }}
+                .map-container > div:first-child > div {{
+                    position: relative !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                    padding: 0 !important;
+                }}
+                .map-container iframe {{
+                    width: 100% !important;
+                    height: 100% !important;
+                    border: 0;
+                    display: block;
                 }}
                 .map-note {{ margin-top: 8px; color: var(--muted); font-size: 13px; }}
                 .muted {{ color: var(--muted); }}
@@ -1026,13 +971,23 @@ async def generate_station_report(
                 .highlight-desc {{ margin: 0; color: #274231; font-size: 14px; }}
                 .analysis-block p {{ margin: 0 0 10px 0; }}
                 .analysis-block h3 {{ margin: 14px 0 6px; }}
+                @media print {{
+                    body {{ background: #fff; }}
+                    .page {{ margin: 0; padding: 0 18px; }}
+                    .pdf-btn {{ display: none; }}
+                }}
             </style>
         </head>
         <body>
             <div class="page">
                 <div class="hero">
-                    <h1>📍 {name}</h1>
-                    <p>{address}</p>
+                    <div class="hero-content">
+                        <div class="hero-info">
+                            <h1>📍 {name}</h1>
+                            <p>{address}</p>
+                        </div>
+                        <button class="pdf-btn" onclick="printReport()"> PDF 출력</button>
+                    </div>
                 </div>
 
                 <div class="section grid two">
@@ -1068,6 +1023,11 @@ async def generate_station_report(
                     </div>
                 </div>
             </div>
+            <script>
+                function printReport() {{
+                    window.print();
+                }}
+            </script>
         </body>
         </html>
         """
