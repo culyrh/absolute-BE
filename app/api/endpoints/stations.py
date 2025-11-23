@@ -472,9 +472,9 @@ async def get_vehicle_services(
 
     # 3) adm_cd2 기반 법정동명 찾기 **(핵심 패치)**
     adm_raw = (
-        station.get("adm_cd2") or
         station.get("법정동코드") or
-        station.get("법정동 코드")  # ← 이거 추가해야 실제 CSV와 맞음
+        station.get("adm_cd2") or
+        station.get("법정동 코드")
     )
     region = get_bjd_name_from_adm(adm_raw)
 
