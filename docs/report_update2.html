@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="utf-8">
+  <title>폐·휴업주유소실태조사보고서 - 동흥주유소</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: 'Noto Sans KR', 'Pretendard', Arial, sans-serif;
+      background: #f5f6fa;
+      color: #1f2937;
+    }
+
+    .report {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 80px 80px 48px;
+      padding-left: 80px;
+      padding-right: 80px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+      border-radius: 16px;
+      border: 1px solid #e5e7eb;
+    }
+
+    .title {
+      text-align: center;
+      margin-bottom: 12px;
+      font-size: 28px;
+      letter-spacing: -0.02em;
+      font-weight: 800;
+    }
+
+    .date {
+      text-align: center;
+      color: #6b7280;
+      margin-bottom: 24px;
+    }
+
+    .section {
+      margin-top: 22px;
+    }
+
+    .section h2 {
+      font-size: 22px;
+      font-weight: 800;
+      /* 굵게 */
+      margin: 28px 0 14px 0;
+      padding-bottom: 6px;
+      display: inline-block;
+    }
+
+    .basic-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .basic-table th,
+    .basic-table td {
+      border: 1px solid #111827;
+      padding: 8px 10px;
+      vertical-align: top;
+    }
+
+    .basic-table th.label {
+      background: #f7f7f7;
+      width: 120px;
+      text-align: center;
+    }
+
+    /* 칼럼 폭 고정 (지도 / 라벨 / 값) */
+    .basic-table col.col-location {
+      width: 260px;
+    }
+
+    .basic-table col.col-label {
+      width: 120px;
+    }
+
+    .basic-table col.col-value {
+      width: auto;
+    }
+
+    /* 위치도: 정사각형 빈칸 */
+    .basic-table .location-box {
+      padding: 0;
+      background: #f0f2f5;
+      border-radius: 12px;
+      border: 1px solid #d1d5db;
+      position: relative;
+    }
+
+    .basic-table .location-box::before {
+      content: "";
+      display: block;
+      padding-top: 100%;
+      /* 1:1 비율 유지 */
+    }
+
+    .placeholder {
+      height: 220px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #9ca3af;
+      font-size: 14px;
+    }
+
+    .info-item {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: #fafafa;
+    }
+
+    .label {
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .value {
+      font-size: 15px;
+      margin-top: 6px;
+      font-weight: 600;
+    }
+
+    /* 추천 활용안에서 1순위/2순위/3순위 제목 */
+    .rank-title {
+      display: block;
+      /* 한 줄 전체 차지 */
+      margin-top: 30px;
+      font-size: 16px;
+      /* 주변 문장보다 조금 크게 */
+      font-weight: 700;
+      /* 굵게 */
+      display: block;
+      color: #111827;
+    }
+
+    .text-box {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 14px;
+      background: #fdfdfd;
+      line-height: 1.7;
+      white-space: pre-line;
+    }
+
+    /* 추천 활용안에서 1순위/2순위/3순위 제목 */
+    .text-box .rank-title {
+      display: block;
+      margin-top: 24px;
+      margin-bottom: 4px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    /* 첫 번째 1순위 제목은 윗 여백 0 */
+    .text-box .rank-title:first-of-type {
+      margin-top: 0;
+    }
+
+    .stats-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .stats-table th,
+    .stats-table td {
+      border: 1px solid #e5e7eb;
+      padding: 8px 10px;
+      text-align: left;
+    }
+
+    .stats-table th {
+      background: #f3f4f6;
+    }
+
+    .subtle {
+      color: #9ca3af;
+      font-size: 13px;
+    }
+
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      /* 3등분 */
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .photo-item {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fafafa;
+      height: 260px;
+      /* 고정 높이 */
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .photo-caption {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      text-align: center;
+      font-size: 14px;
+      margin-top: 6px;
+      color: #6b7280;
+    }
+  </style>
+</head>
+
+<body>
+  <article class="report">
+    <header>
+      <div class="title">폐·휴업주유소실태조사보고서</div>
+      <div class="date">작성일시: 2025-11-24 15:03</div>
+    </header>
+
+    <section class="section">
+      <h2>1. 기본 정보</h2>
+      <table class="basic-table">
+        <colgroup>
+          <col class="col-location">
+          <col class="col-label">
+          <col class="col-value">
+          <col class="col-label">
+          <col class="col-value">
+        </colgroup>
+        <tr>
+          <!-- 위치도 들어갈 정사각형 칸 -->
+          <td class="location-box" rowspan="6"></td>
+          <th class="label">주유소 이름</th>
+          <td colspan="3">동흥주유소</td>
+        </tr>
+        <tr>
+          <th class="label">상태</th>
+          <td colspan="3">폐업</td>
+        </tr>
+        <tr>
+          <th class="label">소재지</th>
+          <td colspan="3">대구광역시 달성군 비슬로566 (현풍면)</td>
+        </tr>
+        <tr>
+          <th class="label">면적</th>
+          <td></td>
+          <th class="label">공시지가</th>
+          <td></td>
+        </tr>
+        <tr>
+          <th class="label">지목</th>
+          <td></td>
+          <th class="label">용도지역·지구</th>
+          <td></td>
+        </tr>
+        <tr>
+          <th class="label">주변환경</th>
+          <td colspan="3">동흥주유소는 대구광역시 달성군 현풍면에 위치하여 교통 접근성이 뛰어나며, 주변 필지 데이터가 부족한 점이 특징입니다. 자동차 관련 시설 활용이 가장 적합하며, 판매시설과
+            기타 활용도 고려할 수 있습니다. 지역 특성을 반영한 맞춤형 재생 전략이 필요합니다.</td>
+        </tr>
+      </table>
+      <p class="subtle">좌표: 위도 35.689819409439494, 경도 128.44564281922678 | 반경 300m 필지 현황: 반경 300m 필지 정보가 확보되지 않았습니다.</p>
+    </section>
+
+
+    <section class="section">
+      <h2>2. 조사 현황</h2>
+      <div class="text-box">[주요 인사이트]
+        - 자동차 관련 시설이 가장 적합한 활용 방안으로 평가되어, 교통 중심지로서의 강점을 활용할 수 있습니다.
+        - 반경 내 필지 데이터 부족으로 인해 주변 인프라 및 수요 분석이 제한적이므로, 추가 조사와 데이터 확보가 필요합니다.
+        - 현풍면은 교통량이 많고 접근성이 우수하여, 차량 이용 고객을 타깃으로 하는 다양한 서비스 개발이 가능할 것으로 보입니다.
+
+        [권장 조치]
+        - 자동차 관련 서비스 및 시설 확장 계획 수립을 추진하여, 지역 교통 허브 역할을 강화한다.
+        - 지역 내 판매시설 및 편의시설 유치를 검토하여, 방문객의 체류 시간을 늘리고 소비를 촉진한다.
+        - 지역 특성에 맞는 커뮤니티 공간 또는 휴게공간 조성을 통해 지역 주민과 방문객 모두를 유치한다.</div>
+    </section>
+
+    <section class="section">
+
+      <div class="photo-grid">
+        <div class="photo-item">
+          <img src="/api/stations/35689819_128445642/terrain"
+            style="width:100%; border-radius:12px; border:1px solid #ccc;">
+        </div>
+        <div class="photo-item">
+          <div class="placeholder">현장사진(로드뷰1)</div>
+        </div>
+        <div class="photo-item">
+          <div class="placeholder">현장사진(로드뷰2)</div>
+        </div>
+      </div>
+
+      <div class="photo-caption">
+        <div>위성사진</div>
+        <div>현장사진(로드뷰1)</div>
+        <div>현장사진(로드뷰2)</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>3. 분석 지표</h2>
+
+      <table class="stats-table">
+        <thead>
+          <tr>
+            <th>지표</th>
+            <th>대상지</th>
+            <th>권역 평균</th>
+            <th>증감률</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>교통량</td>
+            <td>38839.0</td>
+            <td>30881.738636363636</td>
+            <td>25.8%</td>
+          </tr>
+          <tr>
+            <td>관광지수</td>
+            <td>10</td>
+            <td>9.875</td>
+            <td>1.3%</td>
+          </tr>
+          <tr>
+            <td>인구</td>
+            <td>24030.0</td>
+            <td>12845.670454545454</td>
+            <td>87.1%</td>
+          </tr>
+          <tr>
+            <td>상권밀집도</td>
+            <td>0.02</td>
+            <td>0.05693181818181819</td>
+            <td>-64.9%</td>
+          </tr>
+          <tr>
+            <td>parcel_300m</td>
+            <td>303</td>
+            <td>815.0340909090909</td>
+            <td>-62.8%</td>
+          </tr>
+          <tr>
+            <td>parcel_500m</td>
+            <td>848</td>
+            <td>2019.0227272727273</td>
+            <td>-58.0%</td>
+          </tr>
+        </tbody>
+      </table>
+
+    </section>
+
+    <section class="section">
+      <h2>추천 활용안</h2>
+      <div class="text-box">
+        <span class="rank-title">1순위: 자동차 관련시설</span>
+        - 정비소, 세차장, 충전소: 교통 요충지인 위치를 최대한 활용하여 차량 관련 서비스를 제공하면 고객 유입이 증가할 것으로 기대됩니다.
+        - 차량용 부품 및 액세서리 매장: 차량 이용 고객을 대상으로 한 판매시설로서 수요가 높을 것으로 예상되어, 부가가치 창출이 가능합니다.
+        - 차량 공유 및 렌트 서비스: 교통 중심지에 적합하며, 지역 내 교통 편의성을 높이고 신규 수익원을 확보할 수 있습니다.
+        <span class="rank-title">2순위: 판매시설</span>
+        - 편의점, 소형마트: 차량 이용 고객과 지역 주민의 일상 생활 편의를 위해 적합하며, 지속적인 수익 창출이 기대됩니다.
+        - 음식점 및 카페: 차량 대기 시간 동안 고객이 머무를 수 있는 공간 제공으로 고객 만족도를 높일 수 있습니다.
+        - 주차장 확장 및 개선: 교통 접근성을 높이고, 방문객의 편의를 증대시켜 재방문율을 높입니다.
+        <span class="rank-title">3순위: 기타</span>
+        - 커뮤니티 공간 또는 휴게공간: 지역 주민과 방문객 모두를 위한 쉼터를 제공하여 지역 활성화에 기여할 수 있습니다.
+        - 지역 특산품 판매장: 지역 특성을 반영한 상품 판매로 지역 경제 활성화에 도움을 줄 수 있습니다.
+        - 환경 친화적 녹지공간 조성: 친환경 이미지를 구축하고, 지역 정주 여건 개선에 기여할 수 있습니다.
+      </div>
+    </section>
+
+    <section>
+      <h2>지적도 / 토지이용계획확인원</h2>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="placeholder">지적도 이미지</div>
+        </div>
+        <div class="info-item">
+          <div class="placeholder">토지이용계획확인원</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>기타 참고</h2>
+      <p class="subtle">주변 필지 데이터: 미확보</p>
+    </section>
+  </article>
+</body>
+
+</html>

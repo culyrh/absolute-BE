@@ -4,10 +4,16 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import re
 
 import httpx
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 
 class LLMReportService:
@@ -19,12 +25,15 @@ class LLMReportService:
         base_url: Optional[str] = None,
         model: Optional[str] = None,
         timeout: Optional[float] = None,
+        auth_scheme: Optional[str] = None,
     ) -> None:
-        self.api_key = api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
+        raw_api_key = api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
+        self.api_key = raw_api_key.strip() if raw_api_key else None
         self.base_url = base_url or os.getenv(
             "LLM_API_URL", "https://api.openai.com/v1/chat/completions"
         )
-        self.model = model or os.getenv("LLM_MODEL", "gpt-4o-mini")
+        self.model = model or os.getenv("LLM_MODEL", "gpt-5-mini")
+        self.auth_scheme = (auth_scheme or os.getenv("LLM_AUTH_SCHEME") or "Bearer").strip()
         try:
             default_timeout = float(os.getenv("LLM_TIMEOUT", "30"))
         except ValueError:
@@ -78,6 +87,7 @@ class LLMReportService:
             "timeout": self.timeout,
             "force_json": self.force_json_response,
             "temperature": self.temperature,
+            "auth_scheme": self.auth_scheme,
         }
 
         if not self.routing_table:
@@ -153,7 +163,7 @@ class LLMReportService:
     ) -> Optional[str]:
         """LLM API 호출. 실패 시 None."""
 
-        api_key = route_config.get("api_key")
+        api_key = (route_config.get("api_key") or "").strip()
         if not api_key:
             return None
 
@@ -165,9 +175,18 @@ class LLMReportService:
 
         user_prompt = (
             "당신은 도시 재생 및 부동산 활용 전략을 제시하는 컨설턴트입니다. 아래 주유소 정보를 분석하여 "
-            "입지 특성 요약(2~3문장), 인사이트 3개, 권장 실행 항목 3개를 JSON으로만 응답하세요.\n"
-            "JSON 키는 summary(문장), insights(문장 리스트), actions(문장 리스트)입니다.\n"
-            "모든 문장은 한국어 비즈니스 보고서 어투로 작성하고, 다른 설명이나 마크다운은 포함하지 마세요.\n\n"
+            "입지 특성 요약(2~3문장), 인사이트 3개, 권장 실행 항목 3개, 그리고 세부 추천 활용안을 JSON으로만 응답하세요.\n"
+            "JSON 키는 summary(문장), insights(문장 리스트), actions(문장 리스트), detailed_usage(문자열)입니다.\n"
+            "detailed_usage는 다음 형식의 한국어 멀티라인 텍스트로 작성합니다.\n"
+            "각 순위별로 3개의 세부 프로그램을 제안하고, 각 프로그램 선정 이유를 2~3문장으로 설명하세요.\n"
+            "예시 형식:\n"
+            "1순위: 근린생활시설\n"
+            "- 카페: 선정 이유를 2~3문장으로 서술.\n"
+            "- 드라이브스루 매장: 선정 이유를 2~3문장으로 서술.\n"
+            "- 공원·휴게공간: 선정 이유를 2~3문장으로 서술.\n"
+            "2순위: ...\n"
+            "3순위: ...\n"
+            "모든 문장은 한국어 비즈니스 보고서 어투로 작성하고, JSON 이외의 다른 설명이나 마크다운은 포함하지 마세요.\n\n"
             f"[대상 주유소] {station_identifier}\n"
             f"[주유소 정보]\n{station_summary}\n\n"
             f"[추천 활용 방안]\n{recommendation_summary}\n"
@@ -182,10 +201,7 @@ class LLMReportService:
             {"role": "user", "content": user_prompt},
         ]
 
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
+        headers = self._build_headers(api_key, route_config)
         payload = {
             "model": route_config.get("model", self.model),
             "messages": messages,
@@ -213,6 +229,20 @@ class LLMReportService:
             print(f"LLM 보고서 생성 실패: {exc}")
             return None
 
+
+    def _build_headers(self, api_key: str, route_config: Dict[str, Any]) -> Dict[str, str]:
+        """인증 스킴에 맞게 헤더를 구성한다."""
+
+        auth_scheme = (route_config.get("auth_scheme") or self.auth_scheme or "Bearer").strip()
+        headers = {"Content-Type": "application/json"}
+
+        if auth_scheme.lower() == "basic":
+            headers["Authorization"] = f"Basic {api_key}"
+        else:
+            headers["Authorization"] = f"{auth_scheme} {api_key}".strip()
+
+        return headers
+
     def _parse_llm_response(self, content: str) -> Optional[Dict[str, Any]]:
         """LLM 응답을 JSON으로 파싱."""
 
@@ -228,15 +258,18 @@ class LLMReportService:
         summary = str(data.get("summary", "")).strip()
         insights = [str(item).strip() for item in data.get("insights", []) if str(item).strip()]
         actions = [str(item).strip() for item in data.get("actions", []) if str(item).strip()]
+        detailed_usage = str(data.get("detailed_usage", "") or data.get("recommendations_text", "")).strip()
 
-        if not summary and not insights and not actions:
+        if not summary and not insights and not actions and not detailed_usage:
             return None
 
         return {
             "summary": summary,
             "insights": insights,
             "actions": actions,
+            "detailed_usage": detailed_usage,
         }
+
 
     def _format_parcel_summary(self, summary: Optional[Dict[str, Any]]) -> str:
         if not summary:
@@ -425,3 +458,432 @@ class LLMReportService:
             lines.append(line)
 
         return "\n".join(lines[:5])
+
+    # ------------------------------------------------------------------
+    # 보고서 HTML 빌더
+    # ------------------------------------------------------------------
+    def build_report_html(
+        self,
+        *,
+        station: Dict[str, Any],
+        report_date: Optional[datetime] = None,
+        map_html: str,
+        terrain_html: str,
+        llm_report: Optional[Dict[str, Any]],
+        recommendations: List[Dict[str, Any]],
+        stats_payload: Optional[Dict[str, Any]] = None,
+        parcel_summary: Optional[Dict[str, Any]] = None,
+        nearby_parcels_available: bool = False,
+    ) -> str:
+        """주어진 데이터로 폐·휴업 주유소 실태조사 보고서 HTML을 만든다."""
+
+        report_date = report_date or datetime.now()
+        name = station.get("상호") or station.get("name") or "주유소"
+        address = station.get("주소") or station.get("지번주소") or "주소 정보 없음"
+        lat = station.get("위도")
+        lng = station.get("경도")
+
+        summary_text = ""
+        insights: List[str] = []
+        actions: List[str] = []
+        detailed_usage_text = ""
+
+        if isinstance(llm_report, dict):
+            summary_text = llm_report.get("summary") or ""
+            insights = llm_report.get("insights") or []
+            actions = llm_report.get("actions") or []
+            detailed_usage_text = (
+                llm_report.get("detailed_usage")
+                or llm_report.get("recommendations_text")
+                or ""
+            )
+
+        environment_text = summary_text or "LLM 분석 결과를 불러오지 못했습니다. 기본 현황을 참고하세요."
+        investigation_text = self._compose_investigation_section(insights, actions)
+
+        # LLM이 detailed_usage를 돌려주면 그대로 활용안 섹션에 사용
+        if detailed_usage_text:
+            # 1·2·3순위 제목을 span.rank-title 로 감싸기
+            recommendation_text = self._decorate_rank_titles(detailed_usage_text)
+        else:
+            # LLM 실패 시에만 간단한 정적 요약 사용
+            base_text = self._compose_recommendations(recommendations)
+            recommendation_text = self._decorate_rank_titles(base_text)
+
+
+        stats_section = self._compose_stats_section(stats_payload)
+        parcel_text = self._describe_parcel_summary(parcel_summary) or "반경 300m 필지 정보가 확보되지 않았습니다."
+
+        coords_text = f"위도 {lat}, 경도 {lng}" if lat and lng else "좌표 정보 없음"
+
+        return f"""
+        <!DOCTYPE html>
+        <html lang=\"ko\">
+        <head>
+            <meta charset=\"utf-8\">
+            <title>폐·휴업주유소실태조사보고서 - {name}</title>
+            <style>
+                * {{ box-sizing: border-box; }}
+                body {{
+                    margin: 0;
+                    padding: 24px;
+                    font-family: 'Noto Sans KR', 'Pretendard', Arial, sans-serif;
+                    background: #f5f6fa;
+                    color: #1f2937;
+                }}
+                .report {{
+                    max-width: 1200px;
+                    margin: 0 auto;
+                    background: #fff;
+                    padding: 80px 80px 48px;      
+                    padding-left: 80px;
+                    padding-right: 80px;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+                    border-radius: 16px;
+                    border: 1px solid #e5e7eb;
+                }}
+                .title {{
+                    text-align: center;
+                    margin-bottom: 12px;
+                    font-size: 28px;
+                    letter-spacing: -0.02em;
+                    font-weight: 800;
+                }}
+                .date {{ text-align: center; color: #6b7280; margin-bottom: 24px; }}
+                .section {{ margin-top: 22px; }}
+                .section h2 {{
+                    font-size: 22px;         
+                    font-weight: 800;        /* 굵게 */
+                    margin: 28px 0 14px 0;
+                    padding-bottom: 6px;
+                    display: inline-block;
+                }}
+
+                .basic-table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 14px;
+                }}
+                .basic-table th,
+                .basic-table td {{
+                    border: 1px solid #111827;
+                    padding: 8px 10px;
+                    vertical-align: top;
+                }}
+                .basic-table th.label {{
+                    background: #f7f7f7;
+                    width: 120px;
+                    text-align: center;
+                }}
+                /* 칼럼 폭 고정 (지도 / 라벨 / 값) */
+                .basic-table col.col-location {{ width: 260px; }}
+                .basic-table col.col-label    {{ width: 120px; }}
+                .basic-table col.col-value    {{ width: auto; }}
+                /* 위치도: 정사각형 빈칸 */
+                .basic-table .location-box {{
+                    padding: 0;
+                    background: #f0f2f5;
+                    border-radius: 12px;
+                    border: 1px solid #d1d5db;
+                    position: relative;
+                }}
+                .basic-table .location-box::before {{
+                    content: "";
+                    display: block;
+                    padding-top: 100%;  /* 1:1 비율 유지 */
+                }}
+
+                .placeholder {{
+                    height: 220px;
+                    border-radius: 10px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #9ca3af;
+                    font-size: 14px;
+                }}
+
+                .info-item {{
+                    border: 1px solid #e5e7eb;
+                    border-radius: 10px;
+                    padding: 12px 14px;
+                    background: #fafafa;
+                }}
+                .label {{ font-size: 13px; color: #6b7280; }}
+                .value {{ font-size: 15px; margin-top: 6px; font-weight: 600; }}
+                .text-box {{
+                    border: 1px solid #e5e7eb;
+                    border-radius: 10px;
+                    padding: 14px;
+                    background: #fdfdfd;
+                    line-height: 1.7;
+                    white-space: pre-line;
+                }}
+                /* 추천 활용안에서 1순위/2순위/3순위 제목 */
+                .text-box .rank-title {{
+                    display: block;
+                    margin-top: 24px;
+                    margin-bottom: 4px;
+                    font-size: 16px;
+                    font-weight: 700;
+                    color: #111827;
+                }}
+
+                /* 첫 번째 1순위 제목은 윗 여백 0 */
+                .text-box .rank-title:first-of-type {{
+                    margin-top: 0;
+                }}
+                .stats-table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
+                .stats-table th, .stats-table td {{
+                    border: 1px solid #e5e7eb;
+                    padding: 8px 10px;
+                    text-align: left;
+                }}
+                .stats-table th {{ background: #f3f4f6; }}
+                .subtle {{ color: #9ca3af; font-size: 13px; }}
+                .photo-grid {{
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);  /* 3등분 */
+                    gap: 10px;
+                    margin-top: 12px;
+                }}
+
+                .photo-item {{
+                    border: 1px solid #e5e7eb;
+                    border-radius: 10px;
+                    background: #fafafa;
+                    height: 260px;                /* 고정 높이 */
+                    overflow: hidden;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }}
+
+                .photo-caption {{
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    text-align: center;
+                    font-size: 14px;
+                    margin-top: 6px;
+                    color: #6b7280;
+                }}
+
+
+            </style>
+        </head>
+        <body>
+            <article class=\"report\">
+                <header>
+                    <div class=\"title\">폐·휴업주유소실태조사보고서</div>
+                    <div class=\"date\">작성일시: {report_date.strftime('%Y-%m-%d %H:%M')}</div>
+                </header>
+
+                <section class="section">
+                    <h2>1. 기본 정보</h2>
+                    <table class="basic-table">
+                        <colgroup>
+                            <col class="col-location">
+                            <col class="col-label">
+                            <col class="col-value">
+                            <col class="col-label">
+                            <col class="col-value">
+                        </colgroup>
+                        <tr>
+                            <!-- 위치도 들어갈 정사각형 칸 -->
+                            <td class="location-box" rowspan="6"></td>
+                            <th class="label">주유소 이름</th>
+                            <td colspan="3">{name}</td>
+                        </tr>
+                        <tr>
+                            <th class="label">상태</th>
+                            <td colspan="3">폐업</td>
+                        </tr>
+                        <tr>
+                            <th class="label">소재지</th>
+                            <td colspan="3">{address}</td>
+                        </tr>
+                        <tr>
+                            <th class="label">면적</th>
+                            <td></td>
+                            <th class="label">공시지가</th>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <th class="label">지목</th>
+                            <td></td>
+                            <th class="label">용도지역·지구</th>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <th class="label">주변환경</th>
+                            <td colspan="3">{environment_text}</td>
+                        </tr>
+                    </table>
+                    <p class="subtle">좌표: {coords_text} | 반경 300m 필지 현황: {parcel_text}</p>
+                </section>
+
+
+                <section class=\"section\">
+                    <h2>2. 조사 현황</h2>
+                    <div class=\"text-box\">{investigation_text}</div>
+                </section>
+
+                <section class="section">
+
+                    <div class="photo-grid">
+                        <div class="photo-item">{terrain_html}</div>
+                        <div class="photo-item"><div class="placeholder">현장사진(로드뷰1)</div></div>
+                        <div class="photo-item"><div class="placeholder">현장사진(로드뷰2)</div></div>
+                    </div>
+
+                    <div class="photo-caption">
+                        <div>위성사진</div>
+                        <div>현장사진(로드뷰1)</div>
+                        <div>현장사진(로드뷰2)</div>
+                    </div>
+                </section>
+
+                <section class=\"section\">
+                    <h2>3. 분석 지표</h2>
+                    {stats_section}
+                </section>
+
+                <section class=\"section\"> 
+                    <h2>추천 활용안</h2> 
+                    <div class=\"text-box\">
+                        {recommendation_text}
+                        </div>    
+                </section>
+
+                <section>
+                    <h2>지적도 / 토지이용계획확인원</h2>
+                    <div class=\"info-grid\">
+                        <div class=\"info-item\"><div class=\"placeholder\">지적도 이미지</div></div>
+                        <div class=\"info-item\"><div class=\"placeholder\">토지이용계획확인원</div></div>
+                    </div>
+                </section>
+
+                <section class=\"section\">
+                    <h2>기타 참고</h2>
+                    <p class=\"subtle\">주변 필지 데이터: { '확보됨' if nearby_parcels_available else '미확보' }</p>
+                </section>
+            </article>
+        </body>
+        </html>
+        """
+    def _decorate_rank_titles(self, text: str) -> str:
+        """
+        '1순위: XXX' 같은 텍스트를
+        <span class="rank-title">1순위: XXX</span> 으로 변환해주는 후처리 유틸 함수.
+        """
+        pattern = r"(\d+순위\s*:\s*[^\n]+)"
+        return re.sub(pattern, r'<span class="rank-title">\1</span>', text)
+
+
+    def _compose_investigation_section(self, insights: List[str], actions: List[str]) -> str:
+        paragraphs = []
+        if insights:
+            paragraphs.append("[주요 인사이트]")
+            paragraphs.extend(f"- {item}" for item in insights)
+        if actions:
+            paragraphs.append("\n[권장 조치]")
+            paragraphs.extend(f"- {item}" for item in actions)
+        if not paragraphs:
+            return "LLM 조사 결과를 수집하지 못했습니다. 현장 확인 후 업데이트하세요."
+        return "\n".join(paragraphs)
+
+    def _compose_recommendations(self, recommendations: List[Dict[str, Any]]) -> str:
+        """
+        추천 활용안 섹션 텍스트 구성.
+        1순위 / 2순위 / 3순위 제목은 .rank-title 로 감싸서 굵게 표시.
+        LLM이 생성한 세부 설명은 그대로 줄바꿈 유지.
+        """
+        if not recommendations:
+            return "추천 활용안을 불러오지 못했습니다."
+
+        blocks: List[str] = []
+
+        for idx, item in enumerate(recommendations[:3], start=1):
+            usage = item.get("type") or item.get("usage_type") or item.get("category") or "제안 용도"
+            # LLM이 생성한 상세 텍스트(프로그램 + 이유)를 한 덩어리로 받는다고 가정
+            detail = (item.get("detail") or item.get("description") or "").strip()
+
+            # 제목은 굵게/크게
+            lines: List[str] = [f'<span class="rank-title">{idx}순위: {usage}</span>']
+
+            if detail:
+                # 여러 줄이면 그대로 살리되, 앞에 "- " 붙여서 목록처럼 보이게
+                for para in detail.split("\n"):
+                    p = para.strip()
+                    if not p:
+                        continue
+                    lines.append(f"- {p}")
+
+            blocks.append("\n".join(lines))
+
+        # 4~5순위가 있다면 한 줄로만 추가 검토 용도로 표시
+        if len(recommendations) > 3:
+            extra = [
+                (item.get("type") or item.get("usage_type") or item.get("category"))
+                for item in recommendations[3:5]
+                if (item.get("type") or item.get("usage_type") or item.get("category"))
+            ]
+            if extra:
+                blocks.append("추가 검토 대상: " + ", ".join(extra))
+
+        # text-box 에서 white-space: pre-line 이라 \n 기준으로 자연스럽게 줄바꿈됨
+        return "\n\n".join(blocks)
+
+
+
+    def _compose_stats_section(self, payload: Optional[Dict[str, Any]]) -> str:
+        metrics = (payload or {}).get("metrics") or {}
+        train_mean = (payload or {}).get("train_mean") or {}
+        relative = (payload or {}).get("relative") or {}
+
+        rows = []
+        labels = {
+            "traffic": "교통량",
+            "tourism": "관광지수",
+            "population": "인구",
+            "commercial_density": "상권밀집도",
+            "parcel_300m": "parcel_300m",
+            "parcel_500m": "parcel_500m",
+        }
+
+        for key, label in labels.items():
+            value = metrics.get(key, "-")
+            avg = train_mean.get(key, "-")
+            diff = relative.get(key)
+            diff_text = "-"
+            if diff is not None:
+                try:
+                    diff_text = f"{float(diff):.1f}%"
+                except (TypeError, ValueError):
+                    diff_text = str(diff)
+            rows.append(
+                f"<tr><td>{label}</td><td>{value}</td><td>{avg}</td><td>{diff_text}</td></tr>"
+            )
+
+        if not rows:
+            return "<div class=\"text-box\">분석 지표를 불러오지 못했습니다.</div>"
+
+        table_rows = "".join(rows)
+        return f"""
+        <table class=\"stats-table\">
+            <thead><tr><th>지표</th><th>대상지</th><th>권역 평균</th><th>증감률</th></tr></thead>
+            <tbody>{table_rows}</tbody>
+        </table>
+        """
+
+    # def _usage_examples(self, usage_type: str) -> List[str]:
+    #     examples = {
+    #         "업무": ["스타트업 스튜디오", "라이트 오피스·회의실", "공공·민간 합동 거점"],
+    #         "공동주택": ["도심형 소형 주택", "코리빙 레지던스", "청년 특화 주거"],
+    #         "판매": ["지역 특화 리테일", "편의형 슈퍼", "팝업 스토어"],
+    #         "자동차": ["EV 급속·완속 복합 충전소", "프리미엄 세차", "모빌리티 공유 거점"],
+    #     }
+    #     for key, items in examples.items():
+    #         if key in usage_type:
+    #             return items
+    #     return ["복합 커뮤니티 라운지", "지역 맞춤형 서비스 존", "공공·민간 협력형 파일럿"]
