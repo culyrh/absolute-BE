@@ -45,6 +45,8 @@ class LLMReportService:
         except ValueError:
             self.temperature = 0.3
         self.routing_table = self._load_routing_table()
+        self.google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY", "").strip()
+
 
     def _load_routing_table(self) -> Dict[str, Dict[str, Any]]:
         raw_table = os.getenv("LLM_ROUTING_TABLE")
@@ -516,6 +518,37 @@ class LLMReportService:
 
         coords_text = f"위도 {lat}, 경도 {lng}" if lat and lng else "좌표 정보 없음"
 
+        # Google Maps API를 사용하여 위성사진 및 로드뷰 이미지 생성
+        satellite_img = ""
+        streetview1_img = ""
+        streetview2_img = ""
+
+        if lat and lng and self.google_maps_api_key:
+            # 위성사진 (기존 terrain_html 대신 사용)
+            satellite_url = self._get_satellite_image_url(lat, lng, width=600, height=450, zoom=18)
+            if satellite_url:
+                satellite_img = f'<img src="{satellite_url}" alt="위성사진" style="width:100%; height:100%; object-fit:cover; border-radius:10px;">'
+
+            # 로드뷰 1 (heading=0, 북쪽 방향)
+            streetview1_url = self._get_streetview_image_url(lat, lng, heading=0, pitch=0, width=600, height=450, fov=90)
+            if streetview1_url:
+                streetview1_img = f'<img src="{streetview1_url}" alt="현장사진(로드뷰1)" style="width:100%; height:100%; object-fit:cover; border-radius:10px;">'
+
+            # 로드뷰 2 (heading=180, 남쪽 방향 - 반대편 보기)
+            streetview2_url = self._get_streetview_image_url(lat, lng, heading=180, pitch=0, width=600, height=450, fov=90)
+            if streetview2_url:
+                streetview2_img = f'<img src="{streetview2_url}" alt="현장사진(로드뷰2)" style="width:100%; height:100%; object-fit:cover; border-radius:10px;">'
+
+        # 기본값으로 terrain_html 사용 (위성사진이 없을 경우)
+        if not satellite_img:
+            satellite_img = terrain_html if terrain_html else '<div class="placeholder">위성사진</div>'
+
+        # 로드뷰가 없을 경우 placeholder 사용
+        if not streetview1_img:
+            streetview1_img = '<div class="placeholder">현장사진(로드뷰1)</div>'
+        if not streetview2_img:
+            streetview2_img = '<div class="placeholder">현장사진(로드뷰2)</div>'
+
         return f"""
         <!DOCTYPE html>
         <html lang=\"ko\">
@@ -845,9 +878,9 @@ class LLMReportService:
                 <section class="section">
 
                     <div class="photo-grid">
-                        <div class="photo-item">{terrain_html}</div>
-                        <div class="photo-item"><div class="placeholder">현장사진(로드뷰1)</div></div>
-                        <div class="photo-item"><div class="placeholder">현장사진(로드뷰2)</div></div>
+                        <div class="photo-item">{satellite_img}</div>
+                        <div class="photo-item">{streetview1_img}</div>
+                        <div class="photo-item">{streetview2_img}</div>
                     </div>
 
                     <div class="photo-caption">
@@ -1053,3 +1086,63 @@ class LLMReportService:
             return True
         except (TypeError, ValueError):
             return False
+
+    def _get_satellite_image_url(self, lat: float, lng: float, width: int = 640, height: int = 480, zoom: int = 18) -> str:
+        """
+        Google Maps Static API를 사용하여 위성사진 URL을 생성합니다.
+
+        Args:
+            lat: 위도
+            lng: 경도
+            width: 이미지 너비
+            height: 이미지 높이
+            zoom: 줌 레벨 (1-20)
+
+        Returns:
+            위성사진 이미지 URL
+        """
+        if not self.google_maps_api_key:
+            return ""
+
+        base_url = "https://maps.googleapis.com/maps/api/staticmap"
+        params = [
+            f"center={lat},{lng}",
+            f"zoom={zoom}",
+            f"size={width}x{height}",
+            "maptype=satellite",
+            f"key={self.google_maps_api_key}",
+        ]
+        return f"{base_url}?{'&'.join(params)}"
+
+    def _get_streetview_image_url(
+        self, lat: float, lng: float, heading: int = 0, pitch: int = 0,
+        width: int = 640, height: int = 480, fov: int = 90
+    ) -> str:
+        """
+        Google Street View Static API를 사용하여 로드뷰 이미지 URL을 생성합니다.
+
+        Args:
+            lat: 위도
+            lng: 경도
+            heading: 카메라 방향 (0-360, 0=북쪽, 90=동쪽, 180=남쪽, 270=서쪽)
+            pitch: 카메라 상하 각도 (-90 ~ 90, 0=수평)
+            width: 이미지 너비
+            height: 이미지 높이
+            fov: 시야각 (10-120도)
+
+        Returns:
+            로드뷰 이미지 URL
+        """
+        if not self.google_maps_api_key:
+            return ""
+
+        base_url = "https://maps.googleapis.com/maps/api/streetview"
+        params = [
+            f"location={lat},{lng}",
+            f"size={width}x{height}",
+            f"heading={heading}",
+            f"pitch={pitch}",
+            f"fov={fov}",
+            f"key={self.google_maps_api_key}",
+        ]
+        return f"{base_url}?{'&'.join(params)}"
