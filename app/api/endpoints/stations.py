@@ -197,6 +197,90 @@ def kakao_local_search(query: str):
     return results
 
 
+# ============================================================
+# 필지(개별공시지가 + 토지이용계획) 정보 CSV 로더
+# ============================================================
+
+LAND_PRICE_PATH = DATA_DIR / "station_with_landprice.csv"
+LAND_USE_PATH = DATA_DIR / "station_with_landuse.csv"
+
+_LAND_PRICE_DF = None
+_LAND_USE_DF = None
+
+
+def load_land_price_df() -> Optional[pd.DataFrame]:
+    """station_with_landprice.csv 로딩 (한 번만 메모리에 적재)."""
+    global _LAND_PRICE_DF
+    if _LAND_PRICE_DF is not None:
+        return _LAND_PRICE_DF
+
+    try:
+        df = pd.read_csv(LAND_PRICE_PATH, dtype=str)
+    except FileNotFoundError:
+        print(f"⚠️ 개별공시지가 파일 없음: {LAND_PRICE_PATH}")
+        _LAND_PRICE_DF = None
+        return None
+
+    # PNU 정규화
+    if "_PNU" in df.columns:
+        df["_PNU"] = df["_PNU"].astype(str).str.strip()
+    _LAND_PRICE_DF = df
+    return df
+
+
+def load_land_use_df() -> Optional[pd.DataFrame]:
+    """station_with_landuse.csv 로딩 (한 번만 메모리에 적재)."""
+    global _LAND_USE_DF
+    if _LAND_USE_DF is not None:
+        return _LAND_USE_DF
+
+    try:
+        df = pd.read_csv(LAND_USE_PATH, dtype=str)
+    except FileNotFoundError:
+        print(f"⚠️ 토지이용계획 파일 없음: {LAND_USE_PATH}")
+        _LAND_USE_DF = None
+        return None
+
+    if "_PNU" in df.columns:
+        df["_PNU"] = df["_PNU"].astype(str).str.strip()
+    _LAND_USE_DF = df
+    return df
+
+
+def _classify_landuse(code: str, name: str) -> str:
+    """
+    용도지역지구코드 → 대분류 카테고리 분류
+    - 'zoning'       : 용도지역/지구 (주거·상업·공업·녹지, 관리지역 등)
+    - 'infra'        : 도로·철도·주차장·하천 등 기반시설
+    - 'environment'  : 환경·보전·규제 권역
+    - 'development'  : 개발행위·지구단위·도시관리계획 등
+    - 'other'        : 위에 안 걸리는 나머지
+    """
+    code = (code or "").upper()
+
+    # 용도지역·용도지구
+    if code.startswith(("UQA", "UQB", "UQC", "UQD")):
+        return "zoning"
+
+    # 도로, 철도, 주차장, 하천 등 기반시설
+    if code.startswith(("UIA", "UIK", "UQS", "UJB", "UQW")) or code in {
+        "UQS200", "UQS210", "UQS510"
+    }:
+        return "infra"
+
+    # 환경·보전·규제 권역
+    if code.startswith(("UMZ", "UMN", "UMX", "UG", "UOC")) or code in {
+        "UBA100", "UBA200", "UBA300", "UDV100"
+    }:
+        return "environment"
+
+    # 개발 관련(지구단위, 개발제한구역, 성장/개발지구 등)
+    if code.startswith(("UQQ", "UQN", "UQM", "UHA", "UHG", "UHJ", "UM2", "UFM", "UHB", "UHD")):
+        return "development"
+
+    return "other"
+
+
 
 # ============================================================
 # API 엔드포인트
@@ -970,6 +1054,168 @@ async def generate_station_report(
         print(f"보고서 생성 오류: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.get("/{id}/land")
+async def get_station_land(
+    id: str = Path(..., description="좌표 기반 고유 ID (예: 35689819_128445642)"),
+    service: GeoService = Depends(get_geo_service),
+):
+    """
+    특정 주유소(id)의 필지 정보 API
+    - station_with_landprice.csv + station_with_landuse.csv 기반
+    - ID → (lat, lng) 복원 → station.csv에서 가장 가까운 행 찾고, 해당 PNU로 필지 정보 조회
+    """
+    try:
+        # 1) 기본 station.csv 로딩
+        df_station = service.data.get("gas_station")
+        if df_station is None or df_station.empty:
+            raise HTTPException(status_code=500, detail="station.csv 없음")
+
+        df_station = df_station.loc[:, ~df_station.columns.duplicated()]
+
+        if "위도" not in df_station.columns or "경도" not in df_station.columns:
+            raise HTTPException(status_code=500, detail="위도/경도 컬럼이 누락되었습니다.")
+
+        if "PNU" not in df_station.columns:
+            raise HTTPException(status_code=500, detail="PNU 컬럼이 station.csv 에 없습니다.")
+
+        # 2) 좌표 기반 ID 파싱
+        try:
+            lat_part, lng_part = id.split("_")
+            lat = float(lat_part) / 1_000_000
+            lng = float(lng_part) / 1_000_000
+        except Exception:
+            raise HTTPException(status_code=400, detail="ID 형식 오류")
+
+        # 3) 가장 가까운 station 찾기
+        df_station["distance"] = (
+            (df_station["위도"] - lat) ** 2
+            + (df_station["경도"] - lng) ** 2
+        )
+        station_row = df_station.loc[df_station["distance"].idxmin()].to_dict()
+        station_row.pop("distance", None)
+
+        pnu = str(station_row.get("PNU", "")).strip()
+        if not pnu:
+            raise HTTPException(status_code=500, detail="_PNU 값이 비어 있습니다.")
+
+        # --------------------------------------------------
+        # 4) 개별공시지가 조회 (station_with_landprice.csv)
+        # --------------------------------------------------
+        df_price = load_land_price_df()
+        land_price = None
+
+        if df_price is not None:
+            matched_price = df_price[df_price["_PNU"] == pnu]
+
+            if not matched_price.empty:
+                matched_price = matched_price.copy()
+                # 데이터기준일자 기준 최신 1건 사용
+                try:
+                    matched_price["데이터기준일자_norm"] = pd.to_datetime(
+                        matched_price["데이터기준일자"], errors="coerce"
+                    )
+                    matched_price = matched_price.sort_values(
+                        "데이터기준일자_norm", ascending=False
+                    )
+                except Exception:
+                    pass
+
+                row_p = matched_price.iloc[0]
+
+                raw_price = row_p.get("공시지가", "")
+                # 숫자화 (없으면 0)
+                try:
+                    price_num = int(float(raw_price or 0))
+                except Exception:
+                    price_num = 0
+
+                land_price = {
+                    "price": price_num,
+                    "price_str": f"{raw_price}원/㎡" if raw_price != "" else None,
+                    "announce_date": str(row_p.get("공시일자", "")),
+                    "type": (str(row_p.get("특수지구분명", "")) or None),
+                    "data_date": str(row_p.get("데이터기준일자", "")),
+                }
+
+        # --------------------------------------------------
+        # 5) 토지이용계획(용도지역·지구 등) 조회
+        #    station_with_landuse.csv
+        # --------------------------------------------------
+        df_use = load_land_use_df()
+        land_use_summary: Dict[str, List[Dict[str, str]]] = {
+            "zoning": [],
+            "infra": [],
+            "environment": [],
+            "development": [],
+            "other": [],
+        }
+        land_use_raw: List[Dict[str, str]] = []
+
+        if df_use is not None:
+            matched_use = df_use[df_use["_PNU"] == pnu]
+
+            if not matched_use.empty:
+                matched_use = matched_use.copy()
+                # 중복 제거 (code + name + date 기준)
+                seen_pairs = set()
+
+                for _, row_u in matched_use.iterrows():
+                    code = str(row_u.get("용도지역지구코드", "")).strip()
+                    name = str(row_u.get("용도지역지구명", "")).strip()
+                    base_date = str(row_u.get("데이터기준일자", "")).strip()
+
+                    if not code and not name:
+                        continue
+
+                    key = (code, name, base_date)
+                    if key in seen_pairs:
+                        continue
+                    seen_pairs.add(key)
+
+                    cat = _classify_landuse(code, name)
+                    item = {
+                        "code": code,
+                        "name": name,
+                        "data_date": base_date,
+                    }
+                    land_use_summary.setdefault(cat, []).append(item)
+                    land_use_raw.append(item)
+
+        # 빈 카테고리는 제거 (프론트에서 다루기 편하게)
+        land_use_summary = {k: v for k, v in land_use_summary.items() if v}
+
+        # --------------------------------------------------
+        # 6) 최종 응답 구성
+        # --------------------------------------------------
+        response = {
+            "id": id,
+            "name": station_row.get("field5")
+                    or station_row.get("상호")
+                    or station_row.get("name"),
+            "address": station_row.get("field6")
+                       or station_row.get("주소")
+                       or station_row.get("address"),
+            "clean_address": station_row.get("_CLEANADDR"),
+            "pnu": pnu,
+            "location": {
+                "lat": float(station_row.get("위도", 0) or 0),
+                "lng": float(station_row.get("경도", 0) or 0),
+            },
+            "land_price": land_price,
+            "land_use": {
+                "summary": land_use_summary,
+                "raw": land_use_raw,
+            },
+        }
+
+        return JSONResponse(content=response)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"필지 정보 조회 오류: {str(e)}")
 
 
 # ============================================================

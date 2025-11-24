@@ -28,7 +28,13 @@ class GeoService:
             from app.utils.data_loader import load_gas_station_data
         
             self.data["gas_station"] = load_gas_station_data()  # idx가 부여된 station 데이터
-            self.data["gas_station"] = preprocess_gas_station_data(self.data["gas_station"])
+            # (BOM 제거 + 공백제거)
+            self.data["gas_station"].columns = (
+                self.data["gas_station"].columns
+                    .str.replace("\ufeff", "", regex=False)
+                    .str.strip()
+            )
+            self.data["gas_station"] = preprocess_gas_station_data(self.data["gas_station"])        
         
             print(f"🔧 주유소 데이터 로드 완료: {len(self.data['gas_station'])}개 행")
             print("✅ 지리 정보 서비스 초기화 완료")
