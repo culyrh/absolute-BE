@@ -536,8 +536,8 @@ class LLMReportService:
                     margin: 0 auto;
                     background: #fff;
                     padding: 80px 80px 48px;      
-                    padding-left: 80px;
-                    padding-right: 80px;
+                    padding-left: 100px;
+                    padding-right: 100px;
                     box-shadow: 0 10px 40px rgba(0,0,0,0.08);
                     border-radius: 16px;
                     border: 1px solid #e5e7eb;
@@ -690,14 +690,14 @@ class LLMReportService:
                     border: 1px dashed #d1d5db;
                     background: #fff;
                     border-radius: 10px;
-                    padding: 12px 10px 10px;
+                    padding: 12px 12px 10px;
                 }}
                 .bar-chart {{
                     display: grid;
                     grid-template-columns: repeat(6, minmax(0, 1fr));
-                    gap: 10px;
-                    align-items: end;
-                    height: 160px;
+                    gap: 12px;
+                    align-items: stretch;
+                    padding: 6px 4px 2px;
                 }}
                 .bar-wrapper {{
                     display: flex;
@@ -705,17 +705,42 @@ class LLMReportService:
                     align-items: center;
                     font-size: 12px;
                     color: #374151;
-                    gap: 6px;
+                    gap: 4px;
+                    min-width: 0;
+                }}
+                .bar-area {{
+                    position: relative;
+                    width: 100%;
+                    max-width: 42px;
+                    height: 190px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }}
+                .bar-axis {{
+                    position: absolute;
+                    left: 0;
+                    right: 0;
+                    top: 50%;
+                    height: 1px;
                 }}
                 .bar {{
+                    position: absolute;
+                    left: 50%;
+                    transform: translateX(-50%);
                     width: 100%;
-                    max-width: 36px;
+                    max-width: 30px;
                     border-radius: 8px 8px 4px 4px;
                     background: linear-gradient(180deg, #60a5fa, #2563eb);
+                    bottom: 50%;
+                    max-height: 90px;
                     transition: height 0.2s ease;
                 }}
                 .bar.negative {{
                     background: linear-gradient(180deg, #fca5a5, #ef4444);
+                    top: 50%;
+                    bottom: auto;
+                    border-radius: 4px 4px 8px 8px;
                 }}
                 .bar-label {{
                     text-align: center;
@@ -727,6 +752,8 @@ class LLMReportService:
                     color: #111827;
                     text-align: center;
                 }}
+                .bar-value.positive {{ color: #1d4ed8; }}
+                .bar-value.negative {{ color: #dc2626; }}
                 .subtle {{ color: #9ca3af; font-size: 13px; }}
                 .photo-grid {{
                     display: grid;
@@ -836,7 +863,7 @@ class LLMReportService:
                 </section>
 
                 <section class=\"section\"> 
-                    <h2>추천 활용안</h2> 
+                    <h2>4. 추천 활용안</h2> 
                     <div class=\"text-box\">
                         {recommendation_text}
                         </div>    
@@ -975,17 +1002,26 @@ class LLMReportService:
             bar_height = 0
             rel_text = "-"
             bar_class = "bar"
+            value_class = "bar-value"
             if self._is_number(rel_val):
                 rel_num = float(rel_val)
                 rel_text = f"{rel_num:+.1f}%"
-                bar_height = min(max((abs(rel_num) / scale) * 100, 0), 150)
+                bar_height = min(max((abs(rel_num) / scale) * 90, 0), 90)
                 if rel_num < 0:
                     bar_class += " negative"
+                    value_class += " negative"
+                else:
+                    value_class += " positive"
+
+
             chart_bars.append(
                 f"""
                 <div class="bar-wrapper">
-                    <div class="bar-value">{rel_text}</div>
-                    <div class="{bar_class}" style="height:{round(bar_height, 1)}px" title="{label} 상대값 {rel_text}"></div>
+                    <div class="{value_class}">{rel_text}</div>
+                    <div class="bar-area">
+                        <div class="bar-axis"></div>
+                        <div class="{bar_class}" style="height:{round(bar_height, 1)}px" title="{label} 상대값 {rel_text}"></div>
+                    </div>
                     <div class="bar-label">{label}</div>
                 </div>
                 """
@@ -1004,7 +1040,7 @@ class LLMReportService:
                 <div class="metrics-list">{metrics_list}</div>
                 <div class="metric-chart">
                     <div class="bar-chart">{bars}</div>
-                    <div class="subtle" style="margin-top:10px; text-align:center;">상대값(%) 기준 간단 차트</div>
+                    <div class="subtle" style="margin-top:10px; text-align:center;">상대값(%) 기준 차트</div>
                 </div>
             </div>
         </section>
@@ -1017,15 +1053,3 @@ class LLMReportService:
             return True
         except (TypeError, ValueError):
             return False
-
-    # def _usage_examples(self, usage_type: str) -> List[str]:
-    #     examples = {
-    #         "업무": ["스타트업 스튜디오", "라이트 오피스·회의실", "공공·민간 합동 거점"],
-    #         "공동주택": ["도심형 소형 주택", "코리빙 레지던스", "청년 특화 주거"],
-    #         "판매": ["지역 특화 리테일", "편의형 슈퍼", "팝업 스토어"],
-    #         "자동차": ["EV 급속·완속 복합 충전소", "프리미엄 세차", "모빌리티 공유 거점"],
-    #     }
-    #     for key, items in examples.items():
-    #         if key in usage_type:
-    #             return items
-    #     return ["복합 커뮤니티 라운지", "지역 맞춤형 서비스 존", "공공·민간 협력형 파일럿"]

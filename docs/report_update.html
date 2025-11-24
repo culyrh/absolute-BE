@@ -1,3 +1,6 @@
+<!-- 받은 보고서 틀을 토대로 구현,
+ llm 출력 체크용 -->
+
 <!DOCTYPE html>
 <html lang="ko">
 
@@ -22,8 +25,8 @@
       margin: 0 auto;
       background: #fff;
       padding: 80px 80px 48px;
-      padding-left: 80px;
-      padding-right: 80px;
+      padding-left: 100px;
+      padding-right: 100px;
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
       border-radius: 16px;
       border: 1px solid #e5e7eb;
@@ -237,15 +240,15 @@
       border: 1px dashed #d1d5db;
       background: #fff;
       border-radius: 10px;
-      padding: 12px 10px 10px;
+      padding: 12px 12px 10px;
     }
 
     .bar-chart {
       display: grid;
       grid-template-columns: repeat(6, minmax(0, 1fr));
-      gap: 10px;
-      align-items: end;
-      height: 160px;
+      gap: 12px;
+      align-items: stretch;
+      padding: 6px 4px 2px;
     }
 
     .bar-wrapper {
@@ -254,19 +257,46 @@
       align-items: center;
       font-size: 12px;
       color: #374151;
-      gap: 6px;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .bar-area {
+      position: relative;
+      width: 100%;
+      max-width: 42px;
+      height: 190px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .bar-axis {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 1px;
     }
 
     .bar {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
       width: 100%;
-      max-width: 36px;
+      max-width: 30px;
       border-radius: 8px 8px 4px 4px;
       background: linear-gradient(180deg, #60a5fa, #2563eb);
+      bottom: 50%;
+      max-height: 90px;
       transition: height 0.2s ease;
     }
 
     .bar.negative {
       background: linear-gradient(180deg, #fca5a5, #ef4444);
+      top: 50%;
+      bottom: auto;
+      border-radius: 4px 4px 8px 8px;
     }
 
     .bar-label {
@@ -279,6 +309,14 @@
       font-weight: 700;
       color: #111827;
       text-align: center;
+    }
+
+    .bar-value.positive {
+      color: #1d4ed8;
+    }
+
+    .bar-value.negative {
+      color: #dc2626;
     }
 
     .subtle {
@@ -321,7 +359,7 @@
   <article class="report">
     <header>
       <div class="title">폐·휴업주유소실태조사보고서</div>
-      <div class="date">작성일시: 2025-11-24 16:08</div>
+      <div class="date">작성일시: 2025-11-24 19:48</div>
     </header>
 
     <section class="section">
@@ -362,8 +400,8 @@
         </tr>
         <tr>
           <th class="label">주변환경</th>
-          <td colspan="3">동흥주유소는 대구광역시 달성군 현풍면에 위치하여 교통 접근성이 뛰어나며, 주변 상업 및 주거지역과의 연계 가능성이 높은 입지입니다. 그러나 반경 내 필지 데이터 부족으로
-            인한 구체적 활용 방안은 제한적입니다.</td>
+          <td colspan="3">동흥주유소는 대구광역시 달성군 비슬로에 위치하여 교통 접근성이 뛰어나며, 주변에 자동차 관련 시설과 판매시설이 밀집한 지역입니다. 그러나 반경 내 필지 데이터가 부족하여
+            잠재적 활용 방안이 제한적일 수 있습니다.</td>
         </tr>
       </table>
       <p class="subtle">좌표: 위도 35.689819409439494, 경도 128.44564281922678 | 반경 300m 필지 현황: 반경 300m 필지 정보가 확보되지 않았습니다.</p>
@@ -373,14 +411,14 @@
     <section class="section">
       <h2>2. 조사 현황</h2>
       <div class="text-box">[주요 인사이트]
-        - 자동차 관련 시설이 높은 잠재력을 보유하고 있어, 차량 이용 고객 유치에 적합한 전략이 필요합니다.
-        - 판매시설의 활용 가능성이 높아, 지역 주민과 방문객을 대상으로 한 다양한 판매 및 서비스 공간 확장이 유리합니다.
-        - 반경 내 필지 데이터 부족으로 인한 정보 수집 및 분석이 중요하며, 이를 기반으로 한 맞춤형 개발 전략이 요구됩니다.
+        - 자동차 관련 시설이 우세한 위치로, 차량 정비소, 세차장 등 자동차 서비스 업종과의 시너지 효과가 기대됩니다.
+        - 판매시설이 두 번째로 높은 점수를 받아, 편의점, 카페 등 소비자 유입이 용이한 상업시설 도입이 유망합니다.
+        - 반경 내 필지 데이터 부족으로 인해 주변 개발 가능성 및 인구 유입 분석이 제한적이므로, 추가 조사와 데이터 확보가 필요합니다.
 
         [권장 조치]
-        - 자동차 관련 시설을 중심으로 한 복합 서비스센터 또는 정비소를 구축하여 고객 유입을 극대화한다.
-        - 지역 특성에 맞는 판매시설(예: 편의점, 카페 등) 확장 및 리모델링을 추진한다.
-        - 지역 내 필지 확보 및 데이터 수집을 위한 부지 조사와 협력 네트워크 구축을 추진한다.</div>
+        - 자동차 관련 서비스업체와의 협력을 추진하여 시너지 효과를 극대화할 방안을 검토한다.
+        - 편의점, 카페 등 소비자 유입이 높은 판매시설을 유치하여 수익성을 높인다.
+        - 지역 개발 계획 및 인구 유입 가능성을 파악하기 위해 추가 조사와 데이터 수집을 실시한다.</div>
     </section>
 
     <section class="section">
@@ -448,42 +486,60 @@
           <div class="metric-chart">
             <div class="bar-chart">
               <div class="bar-wrapper">
-                <div class="bar-value">+25.8%</div>
-                <div class="bar" style="height:29.6px" title="일교통량(AADT) 상대값 +25.8%"></div>
+                <div class="bar-value positive">+25.8%</div>
+                <div class="bar-area">
+                  <div class="bar-axis"></div>
+                  <div class="bar" style="height:26.6px" title="일교통량(AADT) 상대값 +25.8%"></div>
+                </div>
                 <div class="bar-label">일교통량(AADT)</div>
               </div>
 
               <div class="bar-wrapper">
-                <div class="bar-value">+1.3%</div>
-                <div class="bar" style="height:1.5px" title="관광지수(행정동) 상대값 +1.3%"></div>
+                <div class="bar-value positive">+1.3%</div>
+                <div class="bar-area">
+                  <div class="bar-axis"></div>
+                  <div class="bar" style="height:1.3px" title="관광지수(행정동) 상대값 +1.3%"></div>
+                </div>
                 <div class="bar-label">관광지수(행정동)</div>
               </div>
 
               <div class="bar-wrapper">
-                <div class="bar-value">+87.1%</div>
-                <div class="bar" style="height:100.0px" title="인구수(행정동) 상대값 +87.1%"></div>
+                <div class="bar-value positive">+87.1%</div>
+                <div class="bar-area">
+                  <div class="bar-axis"></div>
+                  <div class="bar" style="height:90.0px" title="인구수(행정동) 상대값 +87.1%"></div>
+                </div>
                 <div class="bar-label">인구수(행정동)</div>
               </div>
 
               <div class="bar-wrapper">
-                <div class="bar-value">-64.9%</div>
-                <div class="bar negative" style="height:74.5px" title="상권지수 상대값 -64.9%"></div>
+                <div class="bar-value negative">-64.9%</div>
+                <div class="bar-area">
+                  <div class="bar-axis"></div>
+                  <div class="bar negative" style="height:67.1px" title="상권지수 상대값 -64.9%"></div>
+                </div>
                 <div class="bar-label">상권지수</div>
               </div>
 
               <div class="bar-wrapper">
-                <div class="bar-value">-62.8%</div>
-                <div class="bar negative" style="height:72.2px" title="반경 300m 필지수 상대값 -62.8%"></div>
+                <div class="bar-value negative">-62.8%</div>
+                <div class="bar-area">
+                  <div class="bar-axis"></div>
+                  <div class="bar negative" style="height:64.9px" title="반경 300m 필지수 상대값 -62.8%"></div>
+                </div>
                 <div class="bar-label">반경 300m 필지수</div>
               </div>
 
               <div class="bar-wrapper">
-                <div class="bar-value">-58.0%</div>
-                <div class="bar negative" style="height:66.6px" title="반경 500m 필지수 상대값 -58.0%"></div>
+                <div class="bar-value negative">-58.0%</div>
+                <div class="bar-area">
+                  <div class="bar-axis"></div>
+                  <div class="bar negative" style="height:60.0px" title="반경 500m 필지수 상대값 -58.0%"></div>
+                </div>
                 <div class="bar-label">반경 500m 필지수</div>
               </div>
             </div>
-            <div class="subtle" style="margin-top:10px; text-align:center;">상대값(%) 기준 간단 차트</div>
+            <div class="subtle" style="margin-top:10px; text-align:center;">상대값(%) 기준 차트</div>
           </div>
         </div>
       </section>
@@ -491,20 +547,20 @@
     </section>
 
     <section class="section">
-      <h2>추천 활용안</h2>
+      <h2>4. 추천 활용안</h2>
       <div class="text-box">
         <span class="rank-title">1순위: 근린생활시설</span>
-        - 카페: 지역 주민과 방문객의 휴식 공간으로서, 지역 특색을 살린 인테리어와 메뉴 개발이 필요합니다. 이를 통해 고객 체류 시간을 늘리고 재방문율을 높일 수 있습니다.
-        - 드라이브스루 매장: 차량 이용 고객의 편의를 위해 드라이브스루 서비스를 도입하는 것이 적합합니다. 특히, 간편한 구매와 빠른 서비스 제공으로 고객 만족도를 향상시킬 수 있습니다.
-        - 공원·휴게공간: 주유소 주변에 소규모 공원 또는 휴게 공간을 조성하여, 가족 단위 고객이나 휴식을 원하는 고객층을 유치할 수 있습니다.
-        <span class="rank-title">2순위: 판매시설</span>
-        - 편의점: 지역 주민과 방문객의 일상 편의를 위해 필수적인 시설로, 다양한 상품 구성과 쾌적한 환경 조성이 필요합니다.
-        - 음식점: 지역 특산물 또는 간편식을 제공하는 음식점 설치로 방문객 체류 시간을 늘리고, 지역경제 활성화에 기여할 수 있습니다.
-        - 소형 마트: 지역 내 생필품 구매를 위한 소형 마트 설치는 고객 유치와 매출 증대에 효과적입니다.
+        - 카페: 지역 주민과 차량 이용 고객의 휴식 공간으로서 유입률이 높아, 안정적인 수익 창출이 기대됩니다.
+        - 드라이브스루 매장: 차량 이동이 많은 위치에 적합하며, 빠른 서비스 제공으로 고객 만족도를 높일 수 있습니다.
+        - 공원·휴게공간: 지역 주민의 여가 공간으로 활용 가능하며, 지역 커뮤니티 활성화에 기여할 수 있습니다.
+        <span class="rank-title">2순위: 자동차 관련 시설</span>
+        - 정비소: 차량 이용 고객이 많은 지역 특성상, 정비소는 지속적인 수요를 확보할 수 있습니다.
+        - 세차장: 차량 관리 수요가 꾸준히 증가하는 추세로, 접근성과 편리성을 고려할 때 적합한 선택입니다.
+        - 차량 용품 판매점: 차량 관련 용품 수요를 충족시키며, 부가 수익 창출이 가능합니다.
         <span class="rank-title">3순위: 기타</span>
-        - 커뮤니티 공간: 지역 주민과의 교류를 위한 커뮤니티 공간 조성으로 지역사회 활성화에 기여할 수 있습니다.
-        - 친환경 주유소: 태양광 설비 등 친환경 설비 도입으로 친환경 이미지 구축과 운영 비용 절감이 가능합니다.
-        - 스마트 주유소: IoT 및 스마트 결제 시스템 도입으로 고객 편의성을 높이고 경쟁력을 확보할 수 있습니다.
+        - 소규모 공장 또는 물류센터: 교통이 편리한 위치를 활용하여 지역 내 물류 허브 역할을 수행할 수 있습니다.
+        - 창고시설: 주변 인프라와 연계하여 효율적인 저장 및 유통이 가능하며, 부가가치 창출이 기대됩니다.
+        - 커뮤니티 센터: 지역 주민의 복지와 커뮤니티 활성화를 위한 공간으로 활용 가능하며, 지역사회와의 연계가 용이합니다.
       </div>
     </section>
 
