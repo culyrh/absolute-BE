@@ -132,19 +132,6 @@
       font-weight: 600;
     }
 
-    /* 추천 활용안에서 1순위/2순위/3순위 제목 */
-    .rank-title {
-      display: block;
-      /* 한 줄 전체 차지 */
-      margin-top: 30px;
-      font-size: 16px;
-      /* 주변 문장보다 조금 크게 */
-      font-weight: 700;
-      /* 굵게 */
-      display: block;
-      color: #111827;
-    }
-
     .text-box {
       border: 1px solid #e5e7eb;
       border-radius: 10px;
@@ -184,6 +171,114 @@
 
     .stats-table th {
       background: #f3f4f6;
+    }
+
+    /* 리포트용 요약 지표 박스 */
+    .metrics-section {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 18px;
+      background: #f9fafb;
+      display: grid;
+      gap: 14px;
+    }
+
+    .metrics-header {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .metrics-title {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .metrics-hint {
+      margin: 0;
+      color: #6b7280;
+      font-size: 13px;
+    }
+
+    .metrics-body {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 14px;
+    }
+
+    .metrics-list {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    .metric-label {
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .metric-value {
+      color: #374151;
+    }
+
+    .metric-chart {
+      border: 1px dashed #d1d5db;
+      background: #fff;
+      border-radius: 10px;
+      padding: 12px 10px 10px;
+    }
+
+    .bar-chart {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+      align-items: end;
+      height: 160px;
+    }
+
+    .bar-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 12px;
+      color: #374151;
+      gap: 6px;
+    }
+
+    .bar {
+      width: 100%;
+      max-width: 36px;
+      border-radius: 8px 8px 4px 4px;
+      background: linear-gradient(180deg, #60a5fa, #2563eb);
+      transition: height 0.2s ease;
+    }
+
+    .bar.negative {
+      background: linear-gradient(180deg, #fca5a5, #ef4444);
+    }
+
+    .bar-label {
+      text-align: center;
+      line-height: 1.3;
+      word-break: keep-all;
+    }
+
+    .bar-value {
+      font-weight: 700;
+      color: #111827;
+      text-align: center;
     }
 
     .subtle {
@@ -226,7 +321,7 @@
   <article class="report">
     <header>
       <div class="title">폐·휴업주유소실태조사보고서</div>
-      <div class="date">작성일시: 2025-11-24 15:03</div>
+      <div class="date">작성일시: 2025-11-24 16:08</div>
     </header>
 
     <section class="section">
@@ -267,8 +362,8 @@
         </tr>
         <tr>
           <th class="label">주변환경</th>
-          <td colspan="3">동흥주유소는 대구광역시 달성군 현풍면에 위치하여 교통 접근성이 뛰어나며, 주변 필지 데이터가 부족한 점이 특징입니다. 자동차 관련 시설 활용이 가장 적합하며, 판매시설과
-            기타 활용도 고려할 수 있습니다. 지역 특성을 반영한 맞춤형 재생 전략이 필요합니다.</td>
+          <td colspan="3">동흥주유소는 대구광역시 달성군 현풍면에 위치하여 교통 접근성이 뛰어나며, 주변 상업 및 주거지역과의 연계 가능성이 높은 입지입니다. 그러나 반경 내 필지 데이터 부족으로
+            인한 구체적 활용 방안은 제한적입니다.</td>
         </tr>
       </table>
       <p class="subtle">좌표: 위도 35.689819409439494, 경도 128.44564281922678 | 반경 300m 필지 현황: 반경 300m 필지 정보가 확보되지 않았습니다.</p>
@@ -278,14 +373,14 @@
     <section class="section">
       <h2>2. 조사 현황</h2>
       <div class="text-box">[주요 인사이트]
-        - 자동차 관련 시설이 가장 적합한 활용 방안으로 평가되어, 교통 중심지로서의 강점을 활용할 수 있습니다.
-        - 반경 내 필지 데이터 부족으로 인해 주변 인프라 및 수요 분석이 제한적이므로, 추가 조사와 데이터 확보가 필요합니다.
-        - 현풍면은 교통량이 많고 접근성이 우수하여, 차량 이용 고객을 타깃으로 하는 다양한 서비스 개발이 가능할 것으로 보입니다.
+        - 자동차 관련 시설이 높은 잠재력을 보유하고 있어, 차량 이용 고객 유치에 적합한 전략이 필요합니다.
+        - 판매시설의 활용 가능성이 높아, 지역 주민과 방문객을 대상으로 한 다양한 판매 및 서비스 공간 확장이 유리합니다.
+        - 반경 내 필지 데이터 부족으로 인한 정보 수집 및 분석이 중요하며, 이를 기반으로 한 맞춤형 개발 전략이 요구됩니다.
 
         [권장 조치]
-        - 자동차 관련 서비스 및 시설 확장 계획 수립을 추진하여, 지역 교통 허브 역할을 강화한다.
-        - 지역 내 판매시설 및 편의시설 유치를 검토하여, 방문객의 체류 시간을 늘리고 소비를 촉진한다.
-        - 지역 특성에 맞는 커뮤니티 공간 또는 휴게공간 조성을 통해 지역 주민과 방문객 모두를 유치한다.</div>
+        - 자동차 관련 시설을 중심으로 한 복합 서비스센터 또는 정비소를 구축하여 고객 유입을 극대화한다.
+        - 지역 특성에 맞는 판매시설(예: 편의점, 카페 등) 확장 및 리모델링을 추진한다.
+        - 지역 내 필지 확보 및 데이터 수집을 위한 부지 조사와 협력 네트워크 구축을 추진한다.</div>
     </section>
 
     <section class="section">
@@ -313,72 +408,103 @@
     <section class="section">
       <h2>3. 분석 지표</h2>
 
-      <table class="stats-table">
-        <thead>
-          <tr>
-            <th>지표</th>
-            <th>대상지</th>
-            <th>권역 평균</th>
-            <th>증감률</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>교통량</td>
-            <td>38839.0</td>
-            <td>30881.738636363636</td>
-            <td>25.8%</td>
-          </tr>
-          <tr>
-            <td>관광지수</td>
-            <td>10</td>
-            <td>9.875</td>
-            <td>1.3%</td>
-          </tr>
-          <tr>
-            <td>인구</td>
-            <td>24030.0</td>
-            <td>12845.670454545454</td>
-            <td>87.1%</td>
-          </tr>
-          <tr>
-            <td>상권밀집도</td>
-            <td>0.02</td>
-            <td>0.05693181818181819</td>
-            <td>-64.9%</td>
-          </tr>
-          <tr>
-            <td>parcel_300m</td>
-            <td>303</td>
-            <td>815.0340909090909</td>
-            <td>-62.8%</td>
-          </tr>
-          <tr>
-            <td>parcel_500m</td>
-            <td>848</td>
-            <td>2019.0227272727273</td>
-            <td>-58.0%</td>
-          </tr>
-        </tbody>
-      </table>
+      <section class="metrics-section">
+        <div class="metrics-header">
+          <h3 class="metrics-title">지표 요약</h3>
+          <p class="metrics-hint">주요 입지 지표와 지역 평균 대비 상대값을 함께 확인하세요.</p>
+        </div>
+        <div class="metrics-body">
+          <div class="metrics-list">
+            <div class="metric-row">
+              <span class="metric-label">일교통량(AADT)</span>
+              <span class="metric-value">38,839</span>
+            </div>
+
+            <div class="metric-row">
+              <span class="metric-label">관광지수(행정동)</span>
+              <span class="metric-value">10</span>
+            </div>
+
+            <div class="metric-row">
+              <span class="metric-label">인구수(행정동)</span>
+              <span class="metric-value">24,030</span>
+            </div>
+
+            <div class="metric-row">
+              <span class="metric-label">상권지수</span>
+              <span class="metric-value">0.020</span>
+            </div>
+
+            <div class="metric-row">
+              <span class="metric-label">반경 300m 필지수</span>
+              <span class="metric-value">303</span>
+            </div>
+
+            <div class="metric-row">
+              <span class="metric-label">반경 500m 필지수</span>
+              <span class="metric-value">848</span>
+            </div>
+          </div>
+          <div class="metric-chart">
+            <div class="bar-chart">
+              <div class="bar-wrapper">
+                <div class="bar-value">+25.8%</div>
+                <div class="bar" style="height:29.6px" title="일교통량(AADT) 상대값 +25.8%"></div>
+                <div class="bar-label">일교통량(AADT)</div>
+              </div>
+
+              <div class="bar-wrapper">
+                <div class="bar-value">+1.3%</div>
+                <div class="bar" style="height:1.5px" title="관광지수(행정동) 상대값 +1.3%"></div>
+                <div class="bar-label">관광지수(행정동)</div>
+              </div>
+
+              <div class="bar-wrapper">
+                <div class="bar-value">+87.1%</div>
+                <div class="bar" style="height:100.0px" title="인구수(행정동) 상대값 +87.1%"></div>
+                <div class="bar-label">인구수(행정동)</div>
+              </div>
+
+              <div class="bar-wrapper">
+                <div class="bar-value">-64.9%</div>
+                <div class="bar negative" style="height:74.5px" title="상권지수 상대값 -64.9%"></div>
+                <div class="bar-label">상권지수</div>
+              </div>
+
+              <div class="bar-wrapper">
+                <div class="bar-value">-62.8%</div>
+                <div class="bar negative" style="height:72.2px" title="반경 300m 필지수 상대값 -62.8%"></div>
+                <div class="bar-label">반경 300m 필지수</div>
+              </div>
+
+              <div class="bar-wrapper">
+                <div class="bar-value">-58.0%</div>
+                <div class="bar negative" style="height:66.6px" title="반경 500m 필지수 상대값 -58.0%"></div>
+                <div class="bar-label">반경 500m 필지수</div>
+              </div>
+            </div>
+            <div class="subtle" style="margin-top:10px; text-align:center;">상대값(%) 기준 간단 차트</div>
+          </div>
+        </div>
+      </section>
 
     </section>
 
     <section class="section">
       <h2>추천 활용안</h2>
       <div class="text-box">
-        <span class="rank-title">1순위: 자동차 관련시설</span>
-        - 정비소, 세차장, 충전소: 교통 요충지인 위치를 최대한 활용하여 차량 관련 서비스를 제공하면 고객 유입이 증가할 것으로 기대됩니다.
-        - 차량용 부품 및 액세서리 매장: 차량 이용 고객을 대상으로 한 판매시설로서 수요가 높을 것으로 예상되어, 부가가치 창출이 가능합니다.
-        - 차량 공유 및 렌트 서비스: 교통 중심지에 적합하며, 지역 내 교통 편의성을 높이고 신규 수익원을 확보할 수 있습니다.
+        <span class="rank-title">1순위: 근린생활시설</span>
+        - 카페: 지역 주민과 방문객의 휴식 공간으로서, 지역 특색을 살린 인테리어와 메뉴 개발이 필요합니다. 이를 통해 고객 체류 시간을 늘리고 재방문율을 높일 수 있습니다.
+        - 드라이브스루 매장: 차량 이용 고객의 편의를 위해 드라이브스루 서비스를 도입하는 것이 적합합니다. 특히, 간편한 구매와 빠른 서비스 제공으로 고객 만족도를 향상시킬 수 있습니다.
+        - 공원·휴게공간: 주유소 주변에 소규모 공원 또는 휴게 공간을 조성하여, 가족 단위 고객이나 휴식을 원하는 고객층을 유치할 수 있습니다.
         <span class="rank-title">2순위: 판매시설</span>
-        - 편의점, 소형마트: 차량 이용 고객과 지역 주민의 일상 생활 편의를 위해 적합하며, 지속적인 수익 창출이 기대됩니다.
-        - 음식점 및 카페: 차량 대기 시간 동안 고객이 머무를 수 있는 공간 제공으로 고객 만족도를 높일 수 있습니다.
-        - 주차장 확장 및 개선: 교통 접근성을 높이고, 방문객의 편의를 증대시켜 재방문율을 높입니다.
+        - 편의점: 지역 주민과 방문객의 일상 편의를 위해 필수적인 시설로, 다양한 상품 구성과 쾌적한 환경 조성이 필요합니다.
+        - 음식점: 지역 특산물 또는 간편식을 제공하는 음식점 설치로 방문객 체류 시간을 늘리고, 지역경제 활성화에 기여할 수 있습니다.
+        - 소형 마트: 지역 내 생필품 구매를 위한 소형 마트 설치는 고객 유치와 매출 증대에 효과적입니다.
         <span class="rank-title">3순위: 기타</span>
-        - 커뮤니티 공간 또는 휴게공간: 지역 주민과 방문객 모두를 위한 쉼터를 제공하여 지역 활성화에 기여할 수 있습니다.
-        - 지역 특산품 판매장: 지역 특성을 반영한 상품 판매로 지역 경제 활성화에 도움을 줄 수 있습니다.
-        - 환경 친화적 녹지공간 조성: 친환경 이미지를 구축하고, 지역 정주 여건 개선에 기여할 수 있습니다.
+        - 커뮤니티 공간: 지역 주민과의 교류를 위한 커뮤니티 공간 조성으로 지역사회 활성화에 기여할 수 있습니다.
+        - 친환경 주유소: 태양광 설비 등 친환경 설비 도입으로 친환경 이미지 구축과 운영 비용 절감이 가능합니다.
+        - 스마트 주유소: IoT 및 스마트 결제 시스템 도입으로 고객 편의성을 높이고 경쟁력을 확보할 수 있습니다.
       </div>
     </section>
 

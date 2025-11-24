@@ -640,6 +640,93 @@ class LLMReportService:
                     text-align: left;
                 }}
                 .stats-table th {{ background: #f3f4f6; }}
+                                /* 리포트용 요약 지표 박스 */
+                .metrics-section {{
+                    border: 1px solid #e5e7eb;
+                    border-radius: 12px;
+                    padding: 18px;
+                    background: #f9fafb;
+                    display: grid;
+                    gap: 14px;
+                }}
+                .metrics-header {{
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                }}
+                .metrics-title {{
+                    margin: 0;
+                    font-size: 17px;
+                    font-weight: 700;
+                    color: #111827;
+                }}
+                .metrics-hint {{
+                    margin: 0;
+                    color: #6b7280;
+                    font-size: 13px;
+                }}
+                .metrics-body {{
+                    display: grid;
+                    grid-template-columns: 1.1fr 1fr;
+                    gap: 14px;
+                }}
+                .metrics-list {{
+                    display: grid;
+                    gap: 8px;
+                    margin-bottom: 14px;
+                }}
+                .metric-row {{
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 8px 10px;
+                    background: #fff;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 13px;
+                }}
+                .metric-label {{ font-weight: 600; color: #111827; }}
+                .metric-value {{ color: #374151; }}
+                .metric-chart {{
+                    border: 1px dashed #d1d5db;
+                    background: #fff;
+                    border-radius: 10px;
+                    padding: 12px 10px 10px;
+                }}
+                .bar-chart {{
+                    display: grid;
+                    grid-template-columns: repeat(6, minmax(0, 1fr));
+                    gap: 10px;
+                    align-items: end;
+                    height: 160px;
+                }}
+                .bar-wrapper {{
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    font-size: 12px;
+                    color: #374151;
+                    gap: 6px;
+                }}
+                .bar {{
+                    width: 100%;
+                    max-width: 36px;
+                    border-radius: 8px 8px 4px 4px;
+                    background: linear-gradient(180deg, #60a5fa, #2563eb);
+                    transition: height 0.2s ease;
+                }}
+                .bar.negative {{
+                    background: linear-gradient(180deg, #fca5a5, #ef4444);
+                }}
+                .bar-label {{
+                    text-align: center;
+                    line-height: 1.3;
+                    word-break: keep-all;
+                }}
+                .bar-value {{
+                    font-weight: 700;
+                    color: #111827;
+                    text-align: center;
+                }}
                 .subtle {{ color: #9ca3af; font-size: 13px; }}
                 .photo-grid {{
                     display: grid;
@@ -838,43 +925,98 @@ class LLMReportService:
 
     def _compose_stats_section(self, payload: Optional[Dict[str, Any]]) -> str:
         metrics = (payload or {}).get("metrics") or {}
-        train_mean = (payload or {}).get("train_mean") or {}
         relative = (payload or {}).get("relative") or {}
 
-        rows = []
-        labels = {
-            "traffic": "교통량",
-            "tourism": "관광지수",
-            "population": "인구",
-            "commercial_density": "상권밀집도",
-            "parcel_300m": "parcel_300m",
-            "parcel_500m": "parcel_500m",
+        label_map = {
+            "traffic": "일교통량(AADT)",
+            "tourism": "관광지수(행정동)",
+            "population": "인구수(행정동)",
+            "commercial_density": "상권지수",
+            "parcel_300m": "반경 300m 필지수",
+            "parcel_500m": "반경 500m 필지수",
         }
 
-        for key, label in labels.items():
-            value = metrics.get(key, "-")
-            avg = train_mean.get(key, "-")
-            diff = relative.get(key)
-            diff_text = "-"
-            if diff is not None:
-                try:
-                    diff_text = f"{float(diff):.1f}%"
-                except (TypeError, ValueError):
-                    diff_text = str(diff)
-            rows.append(
-                f"<tr><td>{label}</td><td>{value}</td><td>{avg}</td><td>{diff_text}</td></tr>"
+        def _fmt_value(val: Any) -> str:
+            if val is None:
+                return "-"
+            try:
+                num = float(val)
+            except (TypeError, ValueError):
+                return str(val)
+            if abs(num) < 1:
+                return f"{num:.3f}"
+            if abs(num) < 1000:
+                return f"{num:,.0f}"
+            return f"{num:,.0f}"
+
+        metric_rows: List[str] = []
+        chart_bars: List[str] = []
+
+        ordered_keys = list(label_map.keys())
+        max_relative = max(
+            (abs(float(v)) for v in relative.values() if self._is_number(v)),
+            default=0.0,
+        )
+        scale = max_relative if max_relative > 0 else 1.0
+
+        for key in ordered_keys:
+            value = _fmt_value(metrics.get(key))
+            label = label_map[key]
+            metric_rows.append(
+                f"""
+                <div class="metric-row">
+                    <span class="metric-label">{label}</span>
+                    <span class="metric-value">{value}</span>
+                </div>
+                """
             )
 
-        if not rows:
-            return "<div class=\"text-box\">분석 지표를 불러오지 못했습니다.</div>"
+            rel_val = relative.get(key)
+            bar_height = 0
+            rel_text = "-"
+            bar_class = "bar"
+            if self._is_number(rel_val):
+                rel_num = float(rel_val)
+                rel_text = f"{rel_num:+.1f}%"
+                bar_height = min(max((abs(rel_num) / scale) * 100, 0), 150)
+                if rel_num < 0:
+                    bar_class += " negative"
+            chart_bars.append(
+                f"""
+                <div class="bar-wrapper">
+                    <div class="bar-value">{rel_text}</div>
+                    <div class="{bar_class}" style="height:{round(bar_height, 1)}px" title="{label} 상대값 {rel_text}"></div>
+                    <div class="bar-label">{label}</div>
+                </div>
+                """
+            )
 
-        table_rows = "".join(rows)
-        return f"""
-        <table class=\"stats-table\">
-            <thead><tr><th>지표</th><th>대상지</th><th>권역 평균</th><th>증감률</th></tr></thead>
-            <tbody>{table_rows}</tbody>
-        </table>
-        """
+        if not metric_rows:
+            return '<div class="text-box">분석 지표를 불러오지 못했습니다.</div>'
+
+        return """
+        <section class="metrics-section">
+            <div class="metrics-header">
+                <h3 class="metrics-title">지표 요약</h3>
+                <p class="metrics-hint">주요 입지 지표와 지역 평균 대비 상대값을 함께 확인하세요.</p>
+            </div>
+            <div class="metrics-body">
+                <div class="metrics-list">{metrics_list}</div>
+                <div class="metric-chart">
+                    <div class="bar-chart">{bars}</div>
+                    <div class="subtle" style="margin-top:10px; text-align:center;">상대값(%) 기준 간단 차트</div>
+                </div>
+            </div>
+        </section>
+        """.format(metrics_list="".join(metric_rows), bars="".join(chart_bars))
+
+    @staticmethod
+    def _is_number(val: Any) -> bool:
+        try:
+            float(val)
+            return True
+        except (TypeError, ValueError):
+            return False
 
     # def _usage_examples(self, usage_type: str) -> List[str]:
     #     examples = {
