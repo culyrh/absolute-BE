@@ -204,48 +204,20 @@ def kakao_local_search(query: str):
 LAND_PRICE_PATH = DATA_DIR / "station_with_landprice.csv"
 LAND_USE_PATH = DATA_DIR / "station_with_landuse.csv"
 
-_LAND_PRICE_DF = None
-_LAND_USE_DF = None
-
-
-def load_land_price_df() -> Optional[pd.DataFrame]:
-    """station_with_landprice.csv 로딩 (한 번만 메모리에 적재)."""
-    global _LAND_PRICE_DF
-    if _LAND_PRICE_DF is not None:
-        return _LAND_PRICE_DF
-
+# CSV는 lazy loading으로만 처리 → import 시점에 절대 읽지 않음
+def load_land_price_df():
     try:
-        df = pd.read_csv(LAND_PRICE_PATH, dtype=str)
-    except FileNotFoundError:
-        print(f"⚠️ 개별공시지가 파일 없음: {LAND_PRICE_PATH}")
-        _LAND_PRICE_DF = None
+        return pd.read_csv(LAND_PRICE_PATH, dtype=str)
+    except Exception as e:
+        print("⚠ land price csv 로딩 오류:", e)
         return None
 
-    # PNU 정규화
-    if "_PNU" in df.columns:
-        df["_PNU"] = df["_PNU"].astype(str).str.strip()
-    _LAND_PRICE_DF = df
-    return df
-
-
-def load_land_use_df() -> Optional[pd.DataFrame]:
-    """station_with_landuse.csv 로딩 (한 번만 메모리에 적재)."""
-    global _LAND_USE_DF
-    if _LAND_USE_DF is not None:
-        return _LAND_USE_DF
-
+def load_land_use_df():
     try:
-        df = pd.read_csv(LAND_USE_PATH, dtype=str)
-    except FileNotFoundError:
-        print(f"⚠️ 토지이용계획 파일 없음: {LAND_USE_PATH}")
-        _LAND_USE_DF = None
+        return pd.read_csv(LAND_USE_PATH, dtype=str)
+    except Exception as e:
+        print("⚠ land use csv 로딩 오류:", e)
         return None
-
-    if "_PNU" in df.columns:
-        df["_PNU"] = df["_PNU"].astype(str).str.strip()
-    _LAND_USE_DF = df
-    return df
-
 
 def _classify_landuse(code: str, name: str) -> str:
     """
