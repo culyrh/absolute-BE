@@ -839,11 +839,54 @@ class LLMReportService:
                     margin-top: 6px;
                     color: #6b7280;
                 }}
+                .print-button {{
+                    position: fixed;
+                    top: 16px;
+                    right: 16px;
+                    z-index: 1000;
+                    padding: 8px 14px;
+                    border-radius: 999px;
+                    border: 1px solid #d1d5db;
+                    background: #ffffff;
+                    cursor: pointer;
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: #374151;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+                }}
+                .print-button:hover {{
+                    background: #f3f4f6;
+                }}
+                /* 👉 인쇄(PDF)용 스타일 */
+                @media print {{
+                    .bar,
+                    .bar.negative {{
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }}
+                    .print-button {{
+                        display: none;
+                    }}
+                    body {{
+                        margin: 0;
+                        padding: 0;
+                        background: #ffffff;
+                    }}
+                    .report {{
+                        box-shadow: none;
+                        border: none;
+                        margin: 0;
+                        border-radius: 0;
+                        padding: 40px 48px;
+                    }}
+                }}
 
 
             </style>
         </head>
         <body>
+            <button class="print-button" onclick="window.print()">PDF 출력</button>
+
             <article class=\"report\">
                 <header>
                     <div class=\"title\">폐·휴업주유소실태조사보고서</div>
