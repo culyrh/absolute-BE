@@ -893,6 +893,7 @@ async def generate_station_report(
             print(f"추천 API 호출 오류: {rec_error}")
 
         parcel_summary = None
+        land_payload: Dict[str, Any] = {}
 
         # 3. 지도 생성
         m = folium.Map(location=[lat, lng], zoom_start=17, tiles='OpenStreetMap')
@@ -904,6 +905,13 @@ async def generate_station_report(
         except Exception as parcel_error:
             print(f"지적도 서비스 오류: {parcel_error}")
             nearby_parcels = None
+
+        try:
+            land_response = await get_station_land(id=id, service=service)
+            raw_land_body = getattr(land_response, "body", b"")
+            land_payload = json.loads(raw_land_body.decode("utf-8")) if raw_land_body else {}
+        except Exception as land_error:
+            print(f"필지 정보 조회 오류: {land_error}")
 
         terrain_png_path = f"/api/stations/{station_id}/terrain"
 
@@ -1015,6 +1023,7 @@ async def generate_station_report(
             recommendations=combined_recommendations,
             stats_payload=stats_payload,
             parcel_summary=parcel_summary,
+            land_payload=land_payload,
             nearby_parcels_available=nearby_parcels is not None and not nearby_parcels.empty,
         )
 

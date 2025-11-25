@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from datetime import datetime
 from pathlib import Path
@@ -330,10 +331,6 @@ class LLMReportService:
         if area:
             summary_parts.append(f"확인된 대지 면적 정보: {area}.")
 
-        parcel_phrase = self._describe_parcel_summary(parcel_summary)
-        if parcel_phrase:
-            summary_parts.append(parcel_phrase)
-
         insights: List[str] = []
         if recommendations:
             top_type = (
@@ -477,6 +474,7 @@ class LLMReportService:
         recommendations: List[Dict[str, Any]],
         stats_payload: Optional[Dict[str, Any]] = None,
         parcel_summary: Optional[Dict[str, Any]] = None,
+        land_payload: Optional[Dict[str, Any]] = None,
         nearby_parcels_available: bool = False,
     ) -> str:
         """주어진 데이터로 폐·휴업 주유소 실태조사 보고서 HTML을 만든다."""
@@ -516,7 +514,20 @@ class LLMReportService:
 
 
         stats_section = self._compose_stats_section(stats_payload)
-        parcel_text = self._describe_parcel_summary(parcel_summary) or "반경 300m 필지 정보가 확보되지 않았습니다."
+
+        land_price = (land_payload or {}).get("land_price") or {}
+        announce_date = land_price.get("announce_date") or "-"
+        land_price_text = land_price.get("price_str") or "-"
+
+        land_use_raw = ((land_payload or {}).get("land_use") or {}).get("raw") or []
+        land_use_names: List[str] = []
+        for item in land_use_raw:
+            name = str(item.get("name", "")).strip()
+            if name and name not in land_use_names:
+                land_use_names.append(name)
+            if len(land_use_names) >= 5:
+                break
+        land_use_text = ", ".join(land_use_names) if land_use_names else "지목 정보 없음"
 
         coords_text = f"위도 {lat}, 경도 {lng}" if lat and lng else "좌표 정보 없음"
 
@@ -702,15 +713,14 @@ class LLMReportService:
                 .metrics-section {{
                     border: 1px solid #e5e7eb;
                     border-radius: 12px;
-                    padding: 18px;
+                    padding: 18px 18px 16px;
                     background: #f9fafb;
                     display: grid;
                     gap: 14px;
                 }}
                 .metrics-header {{
-                    display: flex;
-                    flex-direction: column;
-                    gap: 4px;
+                    display: grid;
+                    gap: 8px;
                 }}
                 .metrics-title {{
                     margin: 0;
@@ -725,13 +735,18 @@ class LLMReportService:
                 }}
                 .metrics-body {{
                     display: grid;
-                    grid-template-columns: 1.1fr 1fr;
+                    grid-template-columns: 1fr 1fr;
                     gap: 14px;
+                    align-items: stretch;
+                }}
+                .metrics-column {{
+                    display: flex;
+                    flex-direction: column;
+                    height: 100%;
                 }}
                 .metrics-list {{
                     display: grid;
                     gap: 8px;
-                    margin-bottom: 14px;
                 }}
                 .metric-row {{
                     display: flex;
@@ -744,6 +759,48 @@ class LLMReportService:
                 }}
                 .metric-label {{ font-weight: 600; color: #111827; }}
                 .metric-value {{ color: #374151; }}
+                .radar-card {{
+                    width: 100%;
+                    border: 1px dashed #d1d5db;
+                    background: #fff;
+                    border-radius: 10px;
+                    padding: 10px;
+                    display: grid;
+                    gap: 6px;
+                    flex: 1;
+                }}
+                .radar-title {{
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: #111827;
+                    text-align: center;
+                }}
+                .radar-chart {{
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 6px;
+                }}
+                .radar-chart svg {{ width: 100%; max-width: 210px; height: auto; overflow: visible; }}
+                .radar-bg-line {{
+                    fill: none;
+                    stroke: #e5e7eb;
+                    stroke-width: 1;
+                }}
+                .radar-axis {{
+                    stroke: #e5e7eb;
+                    stroke-width: 1;
+                }}
+                .radar-area {{
+                    fill: rgba(37, 99, 235, 0.25);
+                    stroke: #2563eb;
+                    stroke-width: 2;
+                }}
+                .radar-label {{
+                    font-size: 11px;
+                    fill: #4b5563;
+                    text-anchor: middle;
+                }}
                 .metric-chart {{
                     border: 1px dashed #d1d5db;
                     background: #fff;
@@ -918,23 +975,21 @@ class LLMReportService:
                             <td colspan="3">{address}</td>
                         </tr>
                         <tr>
-                            <th class="label">면적</th>
-                            <td></td>
+                            <th class="label">공시일자</th>
+                            <td>{announce_date}</td>
                             <th class="label">공시지가</th>
-                            <td></td>
+                            <td>{land_price_text}</td>
                         </tr>
                         <tr>
                             <th class="label">지목</th>
-                            <td></td>
-                            <th class="label">용도지역·지구</th>
-                            <td></td>
+                            <td colspan="3">{land_use_text}</td>
                         </tr>
                         <tr>
                             <th class="label">주변환경</th>
                             <td colspan="3">{environment_text}</td>
                         </tr>
                     </table>
-                    <p class="subtle">좌표: {coords_text} | 반경 300m 필지 현황: {parcel_text}</p>
+                    <p class="subtle">좌표: {coords_text}</p>
                 </section>
 
 
@@ -970,17 +1025,11 @@ class LLMReportService:
                         </div>    
                 </section>
 
-                <section>
-                    <h2>지적도 / 토지이용계획확인원</h2>
+                <section class=\"section\">
+                    <h2>5. 지적도</h2>
                     <div class=\"info-grid\">
                         <div class=\"info-item\"><div class=\"placeholder\">지적도 이미지</div></div>
-                        <div class=\"info-item\"><div class=\"placeholder\">토지이용계획확인원</div></div>
                     </div>
-                </section>
-
-                <section class=\"section\">
-                    <h2>기타 참고</h2>
-                    <p class=\"subtle\">주변 필지 데이터: { '확보됨' if nearby_parcels_available else '미확보' }</p>
                 </section>
             </article>
         </body>
@@ -1079,6 +1128,7 @@ class LLMReportService:
 
         metric_rows: List[str] = []
         chart_bars: List[str] = []
+        radar_values: List[float] = []
 
         ordered_keys = list(label_map.keys())
         max_relative = max(
@@ -1104,16 +1154,18 @@ class LLMReportService:
             rel_text = "-"
             bar_class = "bar"
             value_class = "bar-value"
+            radar_point = 50.0
             if self._is_number(rel_val):
                 rel_num = float(rel_val)
                 rel_text = f"{rel_num:+.1f}%"
                 bar_height = min(max((abs(rel_num) / scale) * 90, 0), 90)
+                radar_point = max(0.0, min(100.0, 50 + rel_num / 2))
                 if rel_num < 0:
                     bar_class += " negative"
                     value_class += " negative"
                 else:
                     value_class += " positive"
-
+            radar_values.append(radar_point)
 
             chart_bars.append(
                 f"""
@@ -1131,21 +1183,85 @@ class LLMReportService:
         if not metric_rows:
             return '<div class="text-box">분석 지표를 불러오지 못했습니다.</div>'
 
+        def _polar_to_cart(index: int, value: float, total: int) -> str:
+            angle = -math.pi / 2 + 2 * math.pi * index / total
+            radius = 90
+            center = 120
+            r = (value / 100) * radius
+            x = center + r * math.cos(angle)
+            y = center + r * math.sin(angle)
+            return f"{x:.1f},{y:.1f}"
+
+        def _label_position(index: int, total: int) -> str:
+            angle = -math.pi / 2 + 2 * math.pi * index / total
+            radius = 115
+            center = 120
+            x = center + radius * math.cos(angle)
+            y = center + radius * math.sin(angle)
+            return f"{x:.1f},{y:.1f}"
+
+        radar_points = " ".join(
+            _polar_to_cart(idx, val, len(ordered_keys))
+            for idx, val in enumerate(radar_values)
+        )
+
+        grid_levels = [100, 70, 40]
+        grid_polygons = "".join(
+            (
+                "<polygon class=\"radar-bg-line\" points=\""
+                + " ".join(
+                    _polar_to_cart(idx, level, len(ordered_keys))
+                    for idx in range(len(ordered_keys))
+                )
+                + "\"></polygon>"
+            )
+            for level in grid_levels
+        )
+
+        axis_lines = "".join(
+            f"<line class=\"radar-axis\" x1=\"120\" y1=\"120\" x2=\"{_polar_to_cart(idx, 100, len(ordered_keys)).split(',')[0]}\" y2=\"{_polar_to_cart(idx, 100, len(ordered_keys)).split(',')[1]}\"></line>"
+            for idx in range(len(ordered_keys))
+        )
+
+        labels_svg = "".join(
+            f"<text class=\"radar-label\" x=\"{_label_position(idx, len(ordered_keys)).split(',')[0]}\" y=\"{_label_position(idx, len(ordered_keys)).split(',')[1]}\">{label_map[key]}</text>"
+            for idx, key in enumerate(ordered_keys)
+        )
+
+        radar_svg = f"""
+            <svg viewBox=\"0 0 240 240\" aria-label=\"입지 지표 레이더 차트\">
+                {grid_polygons}
+                {axis_lines}
+                <polygon class=\"radar-area\" points=\"{radar_points}\"></polygon>
+                {labels_svg}
+            </svg>
+        """
+
         return """
         <section class="metrics-section">
             <div class="metrics-header">
                 <h3 class="metrics-title">지표 요약</h3>
                 <p class="metrics-hint">주요 입지 지표와 지역 평균 대비 상대값을 함께 확인하세요.</p>
+                <div class="metrics-list">{metrics_list}</div>
             </div>
             <div class="metrics-body">
-                <div class="metrics-list">{metrics_list}</div>
+                <div class="metrics-column">
+                    <div class="radar-card">
+                        <div class="radar-title">입지 지표 레이더</div>
+                        <div class="radar-chart">{radar_svg}</div>
+                    </div>
+                </div>
                 <div class="metric-chart">
                     <div class="bar-chart">{bars}</div>
                     <div class="subtle" style="margin-top:10px; text-align:center;">상대값(%) 기준 차트</div>
                 </div>
             </div>
         </section>
-        """.format(metrics_list="".join(metric_rows), bars="".join(chart_bars))
+        """.format(
+            metrics_list="".join(metric_rows),
+            bars="".join(chart_bars),
+            radar_svg=radar_svg,
+        )
 
     @staticmethod
     def _is_number(val: Any) -> bool:
