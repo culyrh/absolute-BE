@@ -1027,6 +1027,72 @@ async def generate_station_report(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/{id}/admin")
+async def get_station_admin_info(
+    id: str = Path(..., description="좌표 기반 고유 ID"),
+    service: GeoService = Depends(get_geo_service),
+):
+    """
+    특정 주유소(id)의 행정동 기준 통계(인구·교통량·상권밀집도·관광지수)
+    - station.csv 기반 raw 값을 그대로 사용
+    - 행정동 이름은 법정동코드(=adm_cd2) → 법정동_코드.csv 매핑
+    """
+
+    # 1) station.csv
+    df = service.data.get("gas_station")
+    if df is None or df.empty:
+        raise HTTPException(status_code=500, detail="station.csv 없음")
+
+    df = df.loc[:, ~df.columns.duplicated()]  # 중복 컬럼 제거
+
+    # 2) ID → lat/lng 복구
+    try:
+        lat_part, lng_part = id.split("_")
+        lat = float(lat_part) / 1_000_000
+        lng = float(lng_part) / 1_000_000
+    except:
+        raise HTTPException(status_code=400, detail="ID 형식 오류")
+
+    # 3) 가장 가까운 station 찾기
+    df["distance"] = (df["위도"] - lat)**2 + (df["경도"] - lng)**2
+    station = df.loc[df["distance"].idxmin()].to_dict()
+    station.pop("distance", None)
+
+    # 4) adm_cd2 / 법정동코드 추출
+    adm_raw = (
+        station.get("법정동코드") or
+        station.get("adm_cd2") or
+        station.get("법정동 코드")
+    )
+    if not adm_raw:
+        return {
+            "id": id,
+            "region": None,
+            "population": None,
+            "traffic": None,
+            "commercial_density": None,
+            "tourism": None,
+        }
+
+    # → 이미 상단에서 로딩한 변환 함수 사용
+    region_name = get_bjd_name_from_adm(adm_raw)
+
+    # 5) station 원본 지표 추출
+    metrics = {
+        "population": station.get("인구") or station.get("인구수"),
+        "traffic": station.get("교통량") or station.get("AADT"),
+        "commercial_density": station.get("상권밀집도"),
+        "tourism": station.get("관광지수"),
+    }
+
+    return {
+        "id": id,
+        "region": region_name,
+        **metrics
+    }
+
+
+
 @router.get("/{id}/land")
 async def get_station_land(
     id: str = Path(..., description="좌표 기반 고유 ID (예: 35689819_128445642)"),
