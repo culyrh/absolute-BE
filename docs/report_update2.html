@@ -73,6 +73,7 @@
       background: #f7f7f7;
       width: 120px;
       text-align: center;
+      vertical-align: middle;
     }
 
     /* 칼럼 폭 고정 (지도 / 라벨 / 값) */
@@ -135,13 +136,84 @@
     .text-box {
       border: 1px solid #e5e7eb;
       border-radius: 10px;
-      padding: 14px;
+      padding: 16px 18px;
       background: #fdfdfd;
-      line-height: 1.7;
+      line-height: 1.75;
       white-space: pre-line;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    .text-box+.text-box {
+      margin-top: 12px;
+    }
+
+    .rank-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .rank-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+      display: flex;
+      flex-direction: column;
+      padding: 18px;
+      min-height: 200px;
+      gap: 10px;
+    }
+
+    .rank-card-header {
+      font-size: 15px;
+      font-weight: 800;
+      color: #0f172a;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .rank-card-body {
+      color: #111827;
+      font-size: 14px;
+      line-height: 1.7;
+      display: grid;
+      gap: 12px;
+    }
+
+    .usage-line {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    .usage-line>div:last-child {
+      white-space: pre-line;
+      width: 100%;
+    }
+
+    .reason-label {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #e0f2fe;
+      color: #0ea5e9;
+      font-weight: 800;
+      font-size: 12px;
+      min-width: 86px;
     }
 
     /* 추천 활용안에서 1순위/2순위/3순위 제목 */
+    .rank-title {
+      display: inline-block;
+      font-size: 16px;
+      font-weight: 800;
+      color: #111827;
+    }
+
     .text-box .rank-title {
       display: block;
       margin-top: 24px;
@@ -466,7 +538,7 @@
   <article class="report">
     <header>
       <div class="title">폐·휴업주유소실태조사보고서</div>
-      <div class="date">작성일시: 2025-11-26 00:03</div>
+      <div class="date">작성일시: 2025-11-26 16:58</div>
     </header>
 
     <section class="section">
@@ -505,8 +577,8 @@
         </tr>
         <tr>
           <th class="label">주변환경</th>
-          <td colspan="3">동흥주유소는 대구광역시 달성군 현풍면에 위치하며, 자동차 관련 시설 활용이 가장 적합한 입지 특성을 가지고 있습니다. 주변 필지 데이터가 부족하여 개발 가능성은
-            제한적이나, 기존 인프라를 활용한 전략이 필요합니다.</td>
+          <td colspan="3">동흥주유소는 대구 달성군 현풍면에 위치하며, 주변은 주거지역과 농경지가 혼합된 환경입니다. 위성사진을 근거로 보면 교통량이 많은 도로변에 위치하여 차량 접근이 용이하며,
+            주변은 주택단지와 소규모 상업시설이 혼재되어 있습니다.</td>
         </tr>
       </table>
       <p class="subtle">좌표: 위도 35.689819409439494, 경도 128.44564281922678</p>
@@ -515,15 +587,13 @@
 
     <section class="section">
       <h2>2. 조사 현황</h2>
-      <div class="text-box">[주요 인사이트]
-        - 자동차 관련 시설은 높은 점수로, 차량 이용 고객 유치에 유리한 위치임을 시사합니다.
-        - 반경 내 필지 데이터 부족으로 개발 및 확장 가능성에 한계가 있으나, 기존 인프라 활용이 중요합니다.
-        - 판매시설과 기타 활용 방안은 상대적으로 낮은 점수로, 우선순위 조정이 필요합니다.
+      <div class="text-box">• 로드뷰1과로드뷰2를 통해 현장 상태를 분석한 결과, 차량이 많이 다니는 도로변에 위치하여 접근성이 매우 높습니다.
 
-        [권장 조치]
-        - 자동차 관련 서비스 센터 또는 정비소를 설치하여 차량 이용 고객을 유치한다.
-        - 기존 주유소 인프라를 활용한 편의점 또는 소형 상점으로 전환하여 수익성을 높인다.
-        - 지역 커뮤니티와 연계한 휴게 공간 또는 차량 관련 교육장 등을 검토한다.</div>
+        • 로드뷰1에서는 주유소 주변이 정비되어 있으며, 차량 회전이 원활하게 이루어지고 있음을 확인할 수 있습니다.
+
+        • 로드뷰2에서는 주변에 주차공간이 확보되어 있고, 인근 상권이 형성되어 있어 유동인구 유입이 기대됩니다.
+
+        • 반면, 분석 지표상 상권지수와 필지수는 낮아, 주변 상권 활성화는 제한적일 수 있음을 고려해야 합니다.</div>
     </section>
 
     <section class="section">
@@ -679,19 +749,60 @@
 
     <section class="section">
       <h2>4. 추천 활용안</h2>
-      <div class="text-box">
-        <span class="rank-title">1순위: 근린생활시설</span>
-        - 카페: 지역 주민과 차량 이용 고객이 휴식을 취할 수 있는 공간으로, 고객 유입과 체류 시간을 늘릴 수 있어 수익 증대에 기여한다. 또한, 지역 커뮤니티 활성화에도 도움이 된다.
-        - 드라이브스루 매장: 차량 이동이 많은 위치 특성을 고려할 때, 빠른 서비스 제공이 가능하여 고객 편의성을 높이고 매출 증대에 효과적이다.
-        - 공원·휴게공간: 지역 주민과 방문객이 자연스럽게 찾을 수 있는 휴게 공간을 조성하여 지역 정체성을 강화하고, 방문 유인을 증대한다.
-        <span class="rank-title">2순위: 자동차 관련 서비스</span>
-        - 차량 정비소: 차량 이용 고객의 재방문율을 높이고, 부가 서비스를 통해 수익을 창출할 수 있다. 주변 인프라와 연계하여 시너지 효과를 기대할 수 있다.
-        - 세차장: 차량 관리 수요가 지속적으로 존재하는 만큼, 안정적인 수익원이 될 수 있다. 접근성 좋은 위치를 활용한다.
-        - 차량 용품 판매점: 차량 관련 용품과 부품을 판매하여 추가 수익을 확보할 수 있으며, 고객 편의성을 높인다.
-        <span class="rank-title">3순위: 기타 활용 방안</span>
-        - 지역 커뮤니티 센터: 지역 주민 대상 다양한 프로그램을 운영하여 지역 활성화와 브랜드 인지도 향상에 기여한다.
-        - 소형 물류 허브: 지역 내 소형 물류센터로 활용하여, 배송 및 물류 효율성을 높이고 지역 경제 활성화에 기여한다.
-        - 농산물 직거래장터: 지역 농가와 연계하여 신선 농산물 판매 공간으로 활용, 지역 농업 활성화와 고객 유치에 도움을 준다.
+      <div class="rank-grid">
+        <div class="rank-card">
+          <div class="rank-card-header"><span class="rank-title"><span class="rank-title">1순위: 근린생활시설</span></span>
+          </div>
+          <div class="rank-card-body">
+            <div class="usage-line">
+              <div class="reason-label">카페</div>
+              <div>• 지역 주민과 차량 이용 고객의 휴식과 만남의 공간으로 활용할 수 있습니다.</div>
+            </div>
+            <div class="usage-line">
+              <div class="reason-label">편의점</div>
+              <div>• 차량 접근이 용이한 위치를 활용하여 편리한 부가 수익을 기대할 수 있습니다.</div>
+            </div>
+            <div class="usage-line">
+              <div class="reason-label">소형 체육시설 또는 공원</div>
+              <div>• 지역 커뮤니티의 거점으로 활용 가능하며, 도시 재생에 기여할 수 있습니다.</div>
+            </div>
+          </div>
+        </div>
+        <div class="rank-card">
+          <div class="rank-card-header"><span class="rank-title"><span class="rank-title">2순위: 자동차 관련 시설</span></span>
+          </div>
+          <div class="rank-card-body">
+            <div class="usage-line">
+              <div class="reason-label">정비소</div>
+              <div>• 차량 수요가 높은 환경을 고려하여 차량 정비 및 서비스 시설 확충이 필요합니다.</div>
+            </div>
+            <div class="usage-line">
+              <div class="reason-label">주차장 확장</div>
+              <div>• 주유소 주변에 충분한 주차 공간 확보로 접근성을 높이고 고객 유입을 유도하세요.</div>
+            </div>
+            <div class="usage-line">
+              <div class="reason-label">충전소</div>
+              <div>• 전기차 수요 증가에 대응하여 충전 인프라를 구축하는 것도 고려하세요.</div>
+            </div>
+          </div>
+        </div>
+        <div class="rank-card">
+          <div class="rank-card-header"><span class="rank-title"><span class="rank-title">3순위: 판매시설</span></span></div>
+          <div class="rank-card-body">
+            <div class="usage-line">
+              <div class="reason-label">소형 쇼핑몰</div>
+              <div>• 지역 주민과 차량 이용 고객을 대상으로 한 소규모 쇼핑 공간을 마련하세요.</div>
+            </div>
+            <div class="usage-line">
+              <div class="reason-label">푸드코트 또는 간이 식당</div>
+              <div>• 차량 이용 고객의 식사 수요를 충족시키며, 상권 활성화에 기여할 수 있습니다.</div>
+            </div>
+            <div class="usage-line">
+              <div class="reason-label">편의점 연계 서비스</div>
+              <div>• 편의점과 연계된 다양한 서비스 제공으로 고객 만족도를 높이세요.</div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -703,7 +814,6 @@
         </div>
       </div>
     </section>
-
   </article>
 </body>
 

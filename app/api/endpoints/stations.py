@@ -920,11 +920,23 @@ async def generate_station_report(
                 style="width:100%; border-radius:12px; border:1px solid #ccc;">
         """
 
+        map_images = report_service.prepare_map_images(lat, lng)
+
+        stats_payload: Dict[str, Any] = {}
+        try:
+            stats_response = await get_station_stats(id=id, service=service)
+            raw_stats_body = getattr(stats_response, "body", b"")
+            stats_payload = json.loads(raw_stats_body.decode("utf-8")) if raw_stats_body else {}
+        except Exception as stats_error:
+            print(f"분석 지표 조회 오류: {stats_error}")
+
         llm_report = await report_service.generate_report(
             station,
             combined_recommendations,
             parcel_summary=parcel_summary,
-            station_id=station_id
+            station_id=station_id,
+            map_images=map_images,
+            stats_payload=stats_payload,
         )
 
         if nearby_parcels is not None and not nearby_parcels.empty:
@@ -1006,14 +1018,6 @@ async def generate_station_report(
         
         map_html = m._repr_html_()
 
-        stats_payload: Dict[str, Any] = {}
-        try:
-            stats_response = await get_station_stats(id=id, service=service)
-            raw_stats_body = getattr(stats_response, "body", b"")
-            stats_payload = json.loads(raw_stats_body.decode("utf-8")) if raw_stats_body else {}
-        except Exception as stats_error:
-            print(f"분석 지표 조회 오류: {stats_error}")
-
         html = report_service.build_report_html(
             station=station,
             report_date=datetime.now(),
@@ -1025,6 +1029,7 @@ async def generate_station_report(
             parcel_summary=parcel_summary,
             land_payload=land_payload,
             nearby_parcels_available=nearby_parcels is not None and not nearby_parcels.empty,
+            map_images=map_images,
         )
 
         return HTMLResponse(content=html)

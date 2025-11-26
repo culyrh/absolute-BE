@@ -140,6 +140,8 @@ class LLMReportService:
         recommendations: List[Dict[str, Any]],
         parcel_summary: Optional[Dict[str, Any]] = None,
         station_id: Optional[int] = None,
+        map_images: Optional[Dict[str, str]] = None,
+        stats_payload: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """보고서에 포함할 요약/인사이트/실행항목을 반환한다."""
 
@@ -150,6 +152,8 @@ class LLMReportService:
             parcel_summary,
             route_config,
             station_id,
+            map_images,
+            stats_payload,
         )
         if llm_response:
             parsed = self._parse_llm_response(llm_response)
@@ -165,6 +169,8 @@ class LLMReportService:
         parcel_summary: Optional[Dict[str, Any]],
         route_config: Dict[str, Any],
         station_id: Optional[int],
+        map_images: Optional[Dict[str, str]],
+        stats_payload: Optional[Dict[str, Any]],
     ) -> Optional[str]:
         """LLM API 호출. 실패 시 None."""
 
@@ -178,25 +184,37 @@ class LLMReportService:
         station_ref = station.get("상호") or station.get("name") or "해당 주유소"
         station_identifier = f"ID {station_id} - {station_ref}" if station_id is not None else station_ref
 
+        visual_context = self._build_visual_prompt_section(map_images or {})
+        stats_context = self._summarise_stats_for_prompt(stats_payload)
+
         user_prompt = (
             "당신은 도시 재생 및 부동산 활용 전략을 제시하는 컨설턴트입니다. 아래 주유소 정보를 분석하여 "
-            "입지 특성 요약(2~3문장), 인사이트 3개, 권장 실행 항목 3개, 그리고 세부 추천 활용안을 JSON으로만 응답하세요.\n"
-            "JSON 키는 summary(문장), insights(문장 리스트), actions(문장 리스트), detailed_usage(문자열)입니다.\n"
+            "입지 특성 요약(2~3문장), 조사 현황(로드뷰·분석 지표 기반 3줄 내외 불릿), 권장 실행 항목 3개, "
+            "그리고 세부 추천 활용안을 JSON으로만 응답하세요.\n"
+            "summary는 위성사진과 주유소 위치를 근거로 주변환경을 묘사하고, investigation은 로드뷰 2장과 "
+            "분석 지표(비중 높게 반영)를 근거로 현장 상태를 설명하는 불릿 텍스트로 작성합니다.\n"
+            "JSON 키는 summary(문장), investigation(멀티라인 문자열), actions(문장 리스트), detailed_usage(문자열)입니다.\n"
             "detailed_usage는 다음 형식의 한국어 멀티라인 텍스트로 작성합니다.\n"
-            "각 순위별로 3개의 세부 프로그램을 제안하고, 각 프로그램 선정 이유를 2~3문장으로 설명하세요.\n"
+            "각 순위별로 3개의 세부 프로그램을 제안하고, 각 프로그램마다 한 줄에 프로그램명을 먼저 적은 뒤 다음 줄에 선정 이유를 2~3문장으로 작성하세요. '[선정이유]' 문구는 쓰지 마세요.\n"
             "예시 형식:\n"
             "1순위: 근린생활시설\n"
-            "- 카페: 선정 이유를 2~3문장으로 서술.\n"
-            "- 드라이브스루 매장: 선정 이유를 2~3문장으로 서술.\n"
-            "- 공원·휴게공간: 선정 이유를 2~3문장으로 서술.\n"
+            "- 카페\n매장 유동과 휴식 수요를 함께 포괄할 수 있습니다.\n"
+            "- 드라이브스루 매장\n차량 접근성이 높아 회전율을 기대할 수 있습니다.\n"
+            "- 공원·휴게공간\n지역 커뮤니티 거점으로 활용 가능합니다.\n"
             "2순위: ...\n"
             "3순위: ...\n"
             "모든 문장은 한국어 비즈니스 보고서 어투로 작성하고, JSON 이외의 다른 설명이나 마크다운은 포함하지 마세요.\n\n"
+            "추천 활용안은 위성사진, 로드뷰, 분석 지표 내용을 모두 참고하되 분석 지표에 가장 높은 비중을 두세요.\n\n"
             f"[대상 주유소] {station_identifier}\n"
             f"[주유소 정보]\n{station_summary}\n\n"
             f"[추천 활용 방안]\n{recommendation_summary}\n"
             f"[반경 300m 필지 통계]\n{parcel_context}\n"
         )
+
+        if visual_context:
+            user_prompt += f"[이미지 데이터]\n{visual_context}\n\n"
+        if stats_context:
+            user_prompt += f"[입지 분석 지표]\n{stats_context}\n"
 
         messages = [
             {
@@ -235,6 +253,57 @@ class LLMReportService:
             return None
 
 
+    def prepare_map_images(
+        self, lat: Optional[Any], lng: Optional[Any], *, width: int = 600, height: int = 450
+    ) -> Dict[str, str]:
+        """LLM 및 보고서 공용으로 사용할 지도/로드뷰 이미지 Base64 묶음."""
+
+        images: Dict[str, str] = {}
+        if not lat or not lng or not self.google_maps_api_key:
+            return images
+
+        try:
+            sat_b64 = self._fetch_satellite_image_b64(
+                float(lat), float(lng), width=width, height=height, zoom=18
+            )
+            if sat_b64:
+                images["satellite"] = sat_b64
+        except Exception as exc:
+            print(f"[Satellite] 이미지 생성 실패: {exc}")
+
+        try:
+            rv1_b64 = self._fetch_streetview_image_b64(
+                float(lat),
+                float(lng),
+                heading=0,
+                pitch=0,
+                width=width,
+                height=height,
+                fov=90,
+            )
+            if rv1_b64:
+                images["streetview1"] = rv1_b64
+        except Exception as exc:
+            print(f"[StreetView1] 이미지 생성 실패: {exc}")
+
+        try:
+            rv2_b64 = self._fetch_streetview_image_b64(
+                float(lat),
+                float(lng),
+                heading=180,
+                pitch=0,
+                width=width,
+                height=height,
+                fov=90,
+            )
+            if rv2_b64:
+                images["streetview2"] = rv2_b64
+        except Exception as exc:
+            print(f"[StreetView2] 이미지 생성 실패: {exc}")
+
+        return images
+
+
     def _build_headers(self, api_key: str, route_config: Dict[str, Any]) -> Dict[str, str]:
         """인증 스킴에 맞게 헤더를 구성한다."""
 
@@ -263,15 +332,17 @@ class LLMReportService:
         summary = str(data.get("summary", "")).strip()
         insights = [str(item).strip() for item in data.get("insights", []) if str(item).strip()]
         actions = [str(item).strip() for item in data.get("actions", []) if str(item).strip()]
+        investigation = str(data.get("investigation", "") or data.get("investigation_text", "")).strip()
         detailed_usage = str(data.get("detailed_usage", "") or data.get("recommendations_text", "")).strip()
 
-        if not summary and not insights and not actions and not detailed_usage:
+        if not summary and not insights and not actions and not detailed_usage and not investigation:
             return None
 
         return {
             "summary": summary,
             "insights": insights,
             "actions": actions,
+            "investigation": investigation,
             "detailed_usage": detailed_usage,
         }
 
@@ -460,6 +531,58 @@ class LLMReportService:
 
         return "\n".join(lines[:5])
 
+    def _build_visual_prompt_section(self, map_images: Dict[str, str]) -> str:
+        lines: List[str] = []
+        if map_images.get("satellite"):
+            lines.append("[위성사진_B64]")
+            lines.append(map_images["satellite"])
+        if map_images.get("streetview1"):
+            lines.append("[로드뷰1_B64]")
+            lines.append(map_images["streetview1"])
+        if map_images.get("streetview2"):
+            lines.append("[로드뷰2_B64]")
+            lines.append(map_images["streetview2"])
+        return "\n".join(lines)
+
+    def _summarise_stats_for_prompt(self, payload: Optional[Dict[str, Any]]) -> str:
+        if not payload:
+            return ""
+        metrics = (payload or {}).get("metrics") or {}
+        relative = (payload or {}).get("relative") or {}
+
+        label_map = {
+            "traffic": "일교통량(AADT)",
+            "tourism": "관광지수(행정동)",
+            "population": "인구수(행정동)",
+            "commercial_density": "상권지수",
+            "parcel_300m": "반경 300m 필지수",
+            "parcel_500m": "반경 500m 필지수",
+        }
+
+        def _fmt_value(val: Any) -> str:
+            if val is None:
+                return "-"
+            try:
+                num = float(val)
+            except (TypeError, ValueError):
+                return str(val)
+            if abs(num) < 1:
+                return f"{num:.3f}"
+            if abs(num) < 1000:
+                return f"{num:,.0f}"
+            return f"{num:,.0f}"
+
+        lines: List[str] = []
+        for key, label in label_map.items():
+            value_text = _fmt_value(metrics.get(key))
+            rel_val = relative.get(key)
+            rel_text = "-"
+            if self._is_number(rel_val):
+                rel_text = f"{float(rel_val):+.1f}%"
+            lines.append(f"- {label}: {value_text} (상대값: {rel_text})")
+
+        return "\n".join(lines)
+
     # ------------------------------------------------------------------
     # 보고서 HTML 빌더
     # ------------------------------------------------------------------
@@ -476,6 +599,7 @@ class LLMReportService:
         parcel_summary: Optional[Dict[str, Any]] = None,
         land_payload: Optional[Dict[str, Any]] = None,
         nearby_parcels_available: bool = False,
+        map_images: Optional[Dict[str, str]] = None,
     ) -> str:
         """주어진 데이터로 폐·휴업 주유소 실태조사 보고서 HTML을 만든다."""
 
@@ -489,11 +613,13 @@ class LLMReportService:
         insights: List[str] = []
         actions: List[str] = []
         detailed_usage_text = ""
+        investigation_raw = ""
 
         if isinstance(llm_report, dict):
             summary_text = llm_report.get("summary") or ""
             insights = llm_report.get("insights") or []
             actions = llm_report.get("actions") or []
+            investigation_raw = llm_report.get("investigation") or ""
             detailed_usage_text = (
                 llm_report.get("detailed_usage")
                 or llm_report.get("recommendations_text")
@@ -501,16 +627,19 @@ class LLMReportService:
             )
 
         environment_text = summary_text or "LLM 분석 결과를 불러오지 못했습니다. 기본 현황을 참고하세요."
-        investigation_text = self._compose_investigation_section(insights, actions)
+        investigation_text = investigation_raw or self._compose_investigation_section(insights, actions)
+        investigation_text = self._format_investigation_text(investigation_text)
 
         # LLM이 detailed_usage를 돌려주면 그대로 활용안 섹션에 사용
         if detailed_usage_text:
-            # 1·2·3순위 제목을 span.rank-title 로 감싸기
-            recommendation_text = self._decorate_rank_titles(detailed_usage_text)
+            recommendation_blocks = self._split_rank_blocks(detailed_usage_text)
         else:
             # LLM 실패 시에만 간단한 정적 요약 사용
             base_text = self._compose_recommendations(recommendations)
-            recommendation_text = self._decorate_rank_titles(base_text)
+            recommendation_blocks = self._split_rank_blocks(base_text)
+
+        recommendation_blocks = [self._decorate_rank_titles(b) for b in recommendation_blocks]
+        recommendation_html = self._render_rank_boxes(recommendation_blocks)
 
 
         stats_section = self._compose_stats_section(stats_payload)
@@ -531,46 +660,70 @@ class LLMReportService:
 
         coords_text = f"위도 {lat}, 경도 {lng}" if lat and lng else "좌표 정보 없음"
 
+        map_images = map_images or {}
+
         # Google Maps API를 서버에서 호출하여 위성/로드뷰 이미지를 Base64로 생성
         satellite_img = ""
         streetview1_img = ""
         streetview2_img = ""
 
+        if map_images.get("satellite"):
+            satellite_img = (
+                f'<img src="data:image/jpeg;base64,{map_images["satellite"]}" '
+                f'alt="위성사진" style="width:100%; height:100%; '
+                f'object-fit:cover; border-radius:10px;">'
+            )
+        if map_images.get("streetview1"):
+            streetview1_img = (
+                f'<img src="data:image/jpeg;base64,{map_images["streetview1"]}" '
+                f'alt="현장사진(로드뷰1)" style="width:100%; height:100%; '
+                f'object-fit:cover; border-radius:10px;">'
+            )
+        if map_images.get("streetview2"):
+            streetview2_img = (
+                f'<img src="data:image/jpeg;base64,{map_images["streetview2"]}" '
+                f'alt="현장사진(로드뷰2)" style="width:100%; height:100%; '
+                f'object-fit:cover; border-radius:10px;">'
+            )
+
         if lat and lng and self.google_maps_api_key:
             try:
-                sat_b64 = self._fetch_satellite_image_b64(float(lat), float(lng), width=600, height=450, zoom=18)
-                if sat_b64:
-                    satellite_img = (
-                        f'<img src="data:image/jpeg;base64,{sat_b64}" '
-                        f'alt="위성사진" style="width:100%; height:100%; '
-                        f'object-fit:cover; border-radius:10px;">'
-                    )
+                if not satellite_img:
+                    sat_b64 = self._fetch_satellite_image_b64(float(lat), float(lng), width=600, height=450, zoom=18)
+                    if sat_b64:
+                        satellite_img = (
+                            f'<img src="data:image/jpeg;base64,{sat_b64}" '
+                            f'alt="위성사진" style="width:100%; height:100%; '
+                            f'object-fit:cover; border-radius:10px;">'
+                        )
             except Exception as e:
                 print(f"[Satellite] 이미지 생성 실패: {e}")
 
             try:
-                rv1_b64 = self._fetch_streetview_image_b64(float(lat), float(lng),
-                                                           heading=0, pitch=0,
-                                                           width=600, height=450, fov=90)
-                if rv1_b64:
-                    streetview1_img = (
-                        f'<img src="data:image/jpeg;base64,{rv1_b64}" '
-                        f'alt="현장사진(로드뷰1)" style="width:100%; height:100%; '
-                        f'object-fit:cover; border-radius:10px;">'
-                    )
+                if not streetview1_img:
+                    rv1_b64 = self._fetch_streetview_image_b64(float(lat), float(lng),
+                                                               heading=0, pitch=0,
+                                                               width=600, height=450, fov=90)
+                    if rv1_b64:
+                        streetview1_img = (
+                            f'<img src="data:image/jpeg;base64,{rv1_b64}" '
+                            f'alt="현장사진(로드뷰1)" style="width:100%; height:100%; '
+                            f'object-fit:cover; border-radius:10px;">'
+                        )
             except Exception as e:
                 print(f"[StreetView1] 이미지 생성 실패: {e}")
 
             try:
-                rv2_b64 = self._fetch_streetview_image_b64(float(lat), float(lng),
-                                                           heading=180, pitch=0,
-                                                           width=600, height=450, fov=90)
-                if rv2_b64:
-                    streetview2_img = (
-                        f'<img src="data:image/jpeg;base64,{rv2_b64}" '
-                        f'alt="현장사진(로드뷰2)" style="width:100%; height:100%; '
-                        f'object-fit:cover; border-radius:10px;">'
-                    )
+                if not streetview2_img:
+                    rv2_b64 = self._fetch_streetview_image_b64(float(lat), float(lng),
+                                                               heading=180, pitch=0,
+                                                               width=600, height=450, fov=90)
+                    if rv2_b64:
+                        streetview2_img = (
+                            f'<img src="data:image/jpeg;base64,{rv2_b64}" '
+                            f'alt="현장사진(로드뷰2)" style="width:100%; height:100%; '
+                            f'object-fit:cover; border-radius:10px;">'
+                        )
             except Exception as e:
                 print(f"[StreetView2] 이미지 생성 실패: {e}")
 
@@ -643,6 +796,7 @@ class LLMReportService:
                     background: #f7f7f7;
                     width: 120px;
                     text-align: center;
+                    vertical-align: middle;
                 }}
                 /* 칼럼 폭 고정 (지도 / 라벨 / 값) */
                 .basic-table col.col-location {{ width: 260px; }}
@@ -683,12 +837,74 @@ class LLMReportService:
                 .text-box {{
                     border: 1px solid #e5e7eb;
                     border-radius: 10px;
-                    padding: 14px;
+                    padding: 16px 18px;
                     background: #fdfdfd;
-                    line-height: 1.7;
+                    line-height: 1.75;
                     white-space: pre-line;
+                    box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+                }}
+                .text-box + .text-box {{
+                    margin-top: 12px;
+                }}
+                .rank-grid {{
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                    gap: 16px;
+                }}
+                .rank-card {{
+                    border: 1px solid #e5e7eb;
+                    border-radius: 14px;
+                    background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+                    box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+                    display: flex;
+                    flex-direction: column;
+                    padding: 18px;
+                    min-height: 200px;
+                    gap: 10px;
+                }}
+                .rank-card-header {{
+                    font-size: 15px;
+                    font-weight: 800;
+                    color: #0f172a;
+                    padding-bottom: 6px;
+                    border-bottom: 1px solid #e5e7eb;
+                }}
+                .rank-card-body {{
+                    color: #111827;
+                    font-size: 14px;
+                    line-height: 1.7;
+                    display: grid;
+                    gap: 12px;
+                }}
+                .usage-line {{
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 6px;
+                }}
+                .usage-line > div:last-child {{
+                    white-space: pre-line;
+                    width: 100%;
+                }}
+                .reason-label {{
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 4px 10px;
+                    border-radius: 999px;
+                    background: #e0f2fe;
+                    color: #0ea5e9;
+                    font-weight: 800;
+                    font-size: 12px;
+                    min-width: 86px;
                 }}
                 /* 추천 활용안에서 1순위/2순위/3순위 제목 */
+                .rank-title {{
+                    display: inline-block;
+                    font-size: 16px;
+                    font-weight: 800;
+                    color: #111827;
+                }}
                 .text-box .rank-title {{
                     display: block;
                     margin-top: 24px;
@@ -1019,10 +1235,8 @@ class LLMReportService:
                 </section>
 
                 <section class=\"section\"> 
-                    <h2>4. 추천 활용안</h2> 
-                    <div class=\"text-box\">
-                        {recommendation_text}
-                        </div>    
+                    <h2>4. 추천 활용안</h2>
+                    {recommendation_html}
                 </section>
 
                 <section class=\"section\">
@@ -1045,16 +1259,149 @@ class LLMReportService:
 
 
     def _compose_investigation_section(self, insights: List[str], actions: List[str]) -> str:
-        paragraphs = []
+        bullets: List[str] = []
         if insights:
-            paragraphs.append("[주요 인사이트]")
-            paragraphs.extend(f"- {item}" for item in insights)
+            bullets.extend(insights)
         if actions:
-            paragraphs.append("\n[권장 조치]")
-            paragraphs.extend(f"- {item}" for item in actions)
-        if not paragraphs:
+            bullets.extend(actions)
+        if not bullets:
             return "LLM 조사 결과를 수집하지 못했습니다. 현장 확인 후 업데이트하세요."
-        return "\n".join(paragraphs)
+        return "\n".join(bullets)
+
+    def _format_investigation_text(self, text: str) -> str:
+        """조사 현황 각 줄에 단순히 '• ' 기호를 붙여 반환한다."""
+
+        if not text:
+            return "LLM 조사 결과를 수집하지 못했습니다. 현장 확인 후 업데이트하세요."
+
+        normalized = re.sub(r"\r\n?", "\n", str(text)).strip()
+        lines = [line.strip() for line in normalized.split("\n") if line.strip()]
+
+        if not lines:
+            return "LLM 조사 결과를 수집하지 못했습니다. 현장 확인 후 업데이트하세요."
+
+        bullet_prefix = re.compile(r"^[•\-\u2022●]\s*")
+        formatted_lines = []
+        for line in lines:
+            cleaned = bullet_prefix.sub("", line).strip()
+            formatted_lines.append(f"• {cleaned}")
+
+        return "\n\n".join(formatted_lines)
+
+
+    def _split_rank_blocks(self, text: str) -> List[str]:
+        """1순위/2순위/3순위 블록 단위로 텍스트를 분리한다."""
+
+        if not text:
+            return []
+
+        pattern = re.compile(r"(\d+순위\s*:[^\n]*)")
+        matches = list(pattern.finditer(text))
+        if not matches:
+            return [text.strip()]
+
+        blocks: List[str] = []
+        for idx, match in enumerate(matches):
+            start = match.start()
+            end = matches[idx + 1].start() if idx + 1 < len(matches) else len(text)
+            block = text[start:end].strip()
+            if block:
+                blocks.append(block)
+        return blocks
+
+
+    def _render_rank_boxes(self, blocks: List[str]) -> str:
+        if not blocks:
+            return '<div class="text-box">추천 활용안을 불러오지 못했습니다.</div>'
+
+        cards = []
+        for block in blocks:
+            lines = [line.strip() for line in block.splitlines() if line.strip()]
+            if not lines:
+                continue
+
+            title = lines[0]
+            body_text = "\n".join(lines[1:]).strip()
+            body_html = (
+                self._format_usage_body(body_text)
+                if body_text
+                else "<div class=\"usage-line\">세부 내용이 없습니다.</div>"
+            )
+
+            cards.append(
+                f"<div class=\"rank-card\">"
+                f"<div class=\"rank-card-header\"><span class=\"rank-title\">{title}</span></div>"
+                f"<div class=\"rank-card-body\">{body_html}</div>"
+                f"</div>"
+            )
+
+        if not cards:
+            return '<div class="text-box">추천 활용안을 불러오지 못했습니다.</div>'
+
+        return '<div class="rank-grid">' + "".join(cards) + "</div>"
+
+    def _format_usage_body(self, text: str) -> str:
+        """각 프로그램명과 선정 이유를 카드 형태로 재구성한다."""
+
+        if not text:
+            return ""
+
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        entries: List[Tuple[str, str]] = []
+        current_label: Optional[str] = None
+        current_reason: List[str] = []
+        bullet_pattern = re.compile(r"^[-•●]\s*(.+)")
+
+        for line in lines:
+            if re.match(r"\d+순위\s*:", line):
+                # 상위 제목은 이미 별도로 렌더링됨
+                continue
+
+            bullet_match = bullet_pattern.match(line)
+            if bullet_match:
+                # 이전 엔트리 저장
+                if current_label or current_reason:
+                    entries.append(
+                        (
+                            current_label or "세부안",
+                            "\n".join(current_reason).strip() or "선정 이유가 제공되지 않았습니다.",
+                        )
+                    )
+                current_label = bullet_match.group(1).strip()
+                current_reason = []
+                continue
+
+            if current_label is None:
+                current_label = line
+                continue
+
+            current_reason.append(line)
+
+        if current_label or current_reason:
+            entries.append(
+                (
+                    current_label or "세부안",
+                    "\n".join(current_reason).strip() or "선정 이유가 제공되지 않았습니다.",
+                )
+            )
+
+        if not entries:
+            return '<div class="usage-line"><div class="reason-label">세부안</div><div>• 선정 이유가 제공되지 않았습니다.</div></div>'
+
+        parts = []
+        for label, reason in entries:
+            parts.append(
+                "".join(
+                    [
+                        '<div class="usage-line">',
+                        f'<div class="reason-label">{label}</div>',
+                        f'<div>• {reason}</div>',
+                        "</div>",
+                    ]
+                )
+            )
+
+        return "".join(parts)
 
     def _compose_recommendations(self, recommendations: List[Dict[str, Any]]) -> str:
         """
@@ -1069,19 +1416,13 @@ class LLMReportService:
 
         for idx, item in enumerate(recommendations[:3], start=1):
             usage = item.get("type") or item.get("usage_type") or item.get("category") or "제안 용도"
-            # LLM이 생성한 상세 텍스트(프로그램 + 이유)를 한 덩어리로 받는다고 가정
             detail = (item.get("detail") or item.get("description") or "").strip()
 
             # 제목은 굵게/크게
             lines: List[str] = [f'<span class="rank-title">{idx}순위: {usage}</span>']
 
-            if detail:
-                # 여러 줄이면 그대로 살리되, 앞에 "- " 붙여서 목록처럼 보이게
-                for para in detail.split("\n"):
-                    p = para.strip()
-                    if not p:
-                        continue
-                    lines.append(f"- {p}")
+            reason_text = detail or "세부 선정 이유는 추후 보완이 필요합니다."
+            lines.append(f"- {usage}\n{reason_text}")
 
             blocks.append("\n".join(lines))
 
