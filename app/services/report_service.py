@@ -193,7 +193,10 @@ class LLMReportService:
             "그리고 세부 추천 활용안을 JSON으로만 응답하세요.\n"
             "summary는 위성사진과 주유소 위치를 근거로 주변환경을 묘사하고, investigation은 로드뷰 2장과 "
             "분석 지표(비중 높게 반영)를 근거로 현장 상태를 설명하는 불릿 텍스트로 작성합니다.\n"
+            "**중요**: investigation은 반드시 줄바꿈(\\n)으로 구분된 3개의 불릿 항목으로 작성하세요. "
+            "각 불릿 항목은 한 문장으로 구성하고, 불릿 기호(•, -)는 포함하지 마세요. 줄바꿈만으로 구분합니다.\n"
             "JSON 키는 summary(문장), investigation(멀티라인 문자열), actions(문장 리스트), detailed_usage(문자열)입니다.\n"
+
             "detailed_usage는 다음 형식의 한국어 멀티라인 텍스트로 작성합니다.\n"
             "각 순위별로 3개의 세부 프로그램을 제안하고, 각 프로그램마다 한 줄에 프로그램명을 먼저 적은 뒤 다음 줄에 선정 이유를 2~3문장으로 작성하세요. '[선정이유]' 문구는 쓰지 마세요.\n"
             "예시 형식:\n"
@@ -1269,24 +1272,29 @@ class LLMReportService:
         return "\n".join(bullets)
 
     def _format_investigation_text(self, text: str) -> str:
-        """조사 현황 각 줄에 단순히 '• ' 기호를 붙여 반환한다."""
-
+        """조사 현황 텍스트를 불릿 포인트로 포맷팅한다."""
         if not text:
             return "LLM 조사 결과를 수집하지 못했습니다. 현장 확인 후 업데이트하세요."
-
+        
         normalized = re.sub(r"\r\n?", "\n", str(text)).strip()
         lines = [line.strip() for line in normalized.split("\n") if line.strip()]
-
+        
+        # 줄바꿈이 없으면 문장 단위로 분리
+        if len(lines) == 1:
+            # 마침표 기준으로 문장 분리
+            sentences = re.split(r'(?<=[.!?])\s+(?=[가-힣A-Z])', lines[0])
+            lines = [s.strip() for s in sentences if s.strip()]
+        
         if not lines:
             return "LLM 조사 결과를 수집하지 못했습니다. 현장 확인 후 업데이트하세요."
-
+        
         bullet_prefix = re.compile(r"^[•\-\u2022●]\s*")
         formatted_lines = []
         for line in lines:
             cleaned = bullet_prefix.sub("", line).strip()
             formatted_lines.append(f"• {cleaned}")
-
-        return "\n\n".join(formatted_lines)
+        
+        return "\n".join(formatted_lines)  # \n\n 대신 \n 사용
 
 
     def _split_rank_blocks(self, text: str) -> List[str]:
