@@ -50,7 +50,9 @@ class LLMReportService:
         self.routing_table = self._load_routing_table()
         self.google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY", "").strip()
 
-
+    # ------------------------------------------------------------------
+    # 라우팅/공통 설정
+    # ------------------------------------------------------------------
     def _load_routing_table(self) -> Dict[str, Dict[str, Any]]:
         raw_table = os.getenv("LLM_ROUTING_TABLE")
         data: Optional[Dict[str, Any]] = None
@@ -134,6 +136,9 @@ class LLMReportService:
             return False
         return str(value).lower() not in {"false", "0", "no"}
 
+    # ------------------------------------------------------------------
+    # LLM 보고서 생성
+    # ------------------------------------------------------------------
     async def generate_report(
         self,
         station: Dict[str, Any],
@@ -182,12 +187,14 @@ class LLMReportService:
         recommendation_summary = self._summarise_recommendations(recommendations)
         parcel_context = self._format_parcel_summary(parcel_summary)
         station_ref = station.get("상호") or station.get("name") or "해당 주유소"
-        station_identifier = f"ID {station_id} - {station_ref}" if station_id is not None else station_ref
+        station_identifier = (
+            f"ID {station_id} - {station_ref}" if station_id is not None else station_ref
+        )
 
         visual_context = self._build_visual_prompt_section(map_images or {})
         stats_context = self._summarise_stats_for_prompt(stats_payload)
 
-        user_prompt = (
+        base_text = (
             "당신은 도시 재생 및 부동산 활용 전략을 제시하는 컨설턴트입니다. 아래 주유소 정보를 분석하여 "
             "입지 특성 요약(2~3문장), 조사 현황(로드뷰·분석 지표 기반 3줄 내외 불릿), 권장 실행 항목 3개, "
             "그리고 세부 추천 활용안을 JSON으로만 응답하세요.\n"
@@ -199,7 +206,8 @@ class LLMReportService:
             "\n"
             "**usage_programs 작성 규칙**:\n"
             "- 반드시 아래 [추천 활용 방안]에 제공된 순서와 명칭(1~3순위)을 그대로 사용하세요. 임의로 변경하거나 새로운 순위를 만들지 마세요.\n"
-            "- 각 항목은 {\"usage\":\"[추천 용도]\", \"rank\":순번, \"programs\":[{\"name\":\"프로그램명\", \"reason\":\"선정 이유 2~3문장\"}, ...]} 형식의 JSON 객체로 작성하세요.\n"
+            '- 각 항목은 {"usage":"[추천 용도]", "rank":순번, '
+            '"programs":[{"name":"프로그램명", "reason":"선정 이유 2~3문장"}, ...]} 형식의 JSON 객체로 작성하세요.\n'
             "- 각 순위별로 프로그램은 정확히 3개를 작성하고, 선정 이유는 2~3문장으로 서술하되 불릿/개행 없이 문장만 포함합니다.\n"
             "- usage에는 제공된 추천 용도명을 그대로 입력하고, programs 배열 외의 여분 텍스트나 마크다운은 추가하지 마세요.\n"
             "\n"
@@ -212,16 +220,49 @@ class LLMReportService:
         )
 
         if visual_context:
-            user_prompt += f"[이미지 데이터]\n{visual_context}\n\n"
+            base_text += f"[이미지 데이터]\n{visual_context}\n\n"
         if stats_context:
-            user_prompt += f"[입지 분석 지표]\n{stats_context}\n"
+            base_text += f"[입지 분석 지표]\n{stats_context}\n"
+
+        # 멀티모달: 텍스트 + 이미지(Base64)는 image_url로만 전달 (프롬프트 문자열에 Base64 포함 안 함)
+        user_content: Any
+        if map_images and any(map_images.values()):
+            user_content_parts: List[Dict[str, Any]] = [{"type": "text", "text": base_text}]
+
+            def _to_data_url(b64: str) -> str:
+                return f"data:image/jpeg;base64,{b64}"
+
+            if map_images.get("satellite"):
+                user_content_parts.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": _to_data_url(map_images["satellite"])},
+                    }
+                )
+            # 로드뷰는 imagery가 있을 때만 map_images에 들어옴
+            if map_images.get("streetview1"):
+                user_content_parts.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": _to_data_url(map_images["streetview1"])},
+                    }
+                )
+            # 토큰/비용 절감 위해 streetview2는 LLM에는 기본적으로 보내지 않음
+
+            user_content = user_content_parts
+        else:
+            # 이미지가 없으면 기존 텍스트-only 방식 유지
+            user_content = base_text
 
         messages = [
             {
                 "role": "system",
                 "content": "도시 입지 분석을 수행하는 한국어 컨설턴트입니다.",
             },
-            {"role": "user", "content": user_prompt},
+            {
+                "role": "user",
+                "content": user_content,
+            },
         ]
 
         headers = self._build_headers(api_key, route_config)
@@ -252,7 +293,9 @@ class LLMReportService:
             print(f"LLM 보고서 생성 실패: {exc}")
             return None
 
-
+    # ------------------------------------------------------------------
+    # 지도/이미지 준비
+    # ------------------------------------------------------------------
     def prepare_map_images(
         self, lat: Optional[Any], lng: Optional[Any], *, width: int = 600, height: int = 450
     ) -> Dict[str, str]:
@@ -262,19 +305,23 @@ class LLMReportService:
         if not lat or not lng or not self.google_maps_api_key:
             return images
 
+        lat_f = float(lat)
+        lng_f = float(lng)
+
         try:
             sat_b64 = self._fetch_satellite_image_b64(
-                float(lat), float(lng), width=width, height=height, zoom=18
+                lat_f, lng_f, width=width, height=height, zoom=18
             )
             if sat_b64:
                 images["satellite"] = sat_b64
         except Exception as exc:
             print(f"[Satellite] 이미지 생성 실패: {exc}")
 
+        # 로드뷰가 있을 때만 시도 (metadata 기반)
         try:
             rv1_b64 = self._fetch_streetview_image_b64(
-                float(lat),
-                float(lng),
+                lat_f,
+                lng_f,
                 heading=0,
                 pitch=0,
                 width=width,
@@ -288,8 +335,8 @@ class LLMReportService:
 
         try:
             rv2_b64 = self._fetch_streetview_image_b64(
-                float(lat),
-                float(lng),
+                lat_f,
+                lng_f,
                 heading=180,
                 pitch=0,
                 width=width,
@@ -302,7 +349,6 @@ class LLMReportService:
             print(f"[StreetView2] 이미지 생성 실패: {exc}")
 
         return images
-
 
     def _build_headers(self, api_key: str, route_config: Dict[str, Any]) -> Dict[str, str]:
         """인증 스킴에 맞게 헤더를 구성한다."""
@@ -317,6 +363,9 @@ class LLMReportService:
 
         return headers
 
+    # ------------------------------------------------------------------
+    # LLM 응답 파싱/기본 보고서
+    # ------------------------------------------------------------------
     def _parse_llm_response(self, content: str) -> Optional[Dict[str, Any]]:
         """LLM 응답을 JSON으로 파싱."""
 
@@ -332,11 +381,24 @@ class LLMReportService:
         summary = str(data.get("summary", "")).strip()
         insights = [str(item).strip() for item in data.get("insights", []) if str(item).strip()]
         actions = [str(item).strip() for item in data.get("actions", []) if str(item).strip()]
-        investigation = str(data.get("investigation", "") or data.get("investigation_text", "")).strip()
-        detailed_usage = str(data.get("detailed_usage", "") or data.get("recommendations_text", "")).strip()
-        usage_programs = data.get("usage_programs") or data.get("programs") or data.get("usage_details")
+        investigation = str(
+            data.get("investigation", "") or data.get("investigation_text", "")
+        ).strip()
+        detailed_usage = str(
+            data.get("detailed_usage", "") or data.get("recommendations_text", "")
+        ).strip()
+        usage_programs = (
+            data.get("usage_programs") or data.get("programs") or data.get("usage_details")
+        )
 
-        if not summary and not insights and not actions and not detailed_usage and not investigation and not usage_programs:
+        if (
+            not summary
+            and not insights
+            and not actions
+            and not detailed_usage
+            and not investigation
+            and not usage_programs
+        ):
             return None
 
         return {
@@ -347,7 +409,6 @@ class LLMReportService:
             "detailed_usage": detailed_usage,
             "usage_programs": usage_programs,
         }
-
 
     def _format_parcel_summary(self, summary: Optional[Dict[str, Any]]) -> str:
         if not summary:
@@ -394,7 +455,9 @@ class LLMReportService:
 
         name = station.get("상호") or station.get("name") or "해당 주유소"
         address = station.get("주소") or station.get("address") or "-"
-        land_use = station.get("용도지역") or station.get("토지용도") or station.get("지목") or "정보 없음"
+        land_use = (
+            station.get("용도지역") or station.get("토지용도") or station.get("지목") or "정보 없음"
+        )
         area = station.get("대지면적") or station.get("면적") or station.get("AREA")
 
         summary_parts = [
@@ -429,54 +492,9 @@ class LLMReportService:
             "actions": actions,
         }
 
-        if not parcel_summary:
-            return None
-
-        total = parcel_summary.get("total_count")
-        if not total:
-            return None
-
-        average_area = parcel_summary.get("average_area") or 0
-        bucket_counts = parcel_summary.get("bucket_counts", {})
-        small = bucket_counts.get("소형", 0)
-        medium = bucket_counts.get("중형", 0)
-        large = bucket_counts.get("대형", 0)
-        xlarge = bucket_counts.get("초대형", 0)
-
-        phrases = [
-            f"반경 300m 내 필지 {total}개, 평균 면적 약 {average_area:.0f}㎡가 확인됩니다."
-        ]
-
-        distribution_bits = []
-        if small:
-            distribution_bits.append(f"소형 {small}개")
-        if medium:
-            distribution_bits.append(f"중형 {medium}개")
-        if large:
-            distribution_bits.append(f"대형 {large}개")
-        if xlarge:
-            distribution_bits.append(f"초대형 {xlarge}개")
-        if distribution_bits:
-            phrases.append("면적 분포는 " + ", ".join(distribution_bits) + " 수준입니다.")
-
-        top_land_uses = parcel_summary.get("top_land_uses") or []
-        if top_land_uses:
-            lead = top_land_uses[0]
-            if lead.get("use"):
-                phrases.append(
-                    f"주요 지목은 '{lead['use']}' 계열이 두드러집니다."
-                )
-
-        closest = parcel_summary.get("closest") or {}
-        distance = closest.get("distance_m")
-        label = closest.get("label")
-        if distance:
-            phrases.append(
-                f"지도 중심과 약 {distance:.0f}m 거리에 위치한 {label or '인접 필지'}가 핵심 앵커로 활용될 수 있습니다."
-            )
-
-        return " ".join(phrases)
-
+    # ------------------------------------------------------------------
+    # 프롬프트용 요약/텍스트 유틸
+    # ------------------------------------------------------------------
     def _summarise_station(self, station: Dict[str, Any]) -> str:
         """보고서 프롬프트에 활용할 핵심 정보 정리."""
 
@@ -515,8 +533,15 @@ class LLMReportService:
 
         lines = []
         for item in recommendations:
-            usage = item.get("type") or item.get("usage_type") or item.get("category") or "미정"
-            score = item.get("score") or item.get("similarity") or item.get("rank") or item.get("probability")
+            usage = (
+                item.get("type") or item.get("usage_type") or item.get("category") or "미정"
+            )
+            score = (
+                item.get("score")
+                or item.get("similarity")
+                or item.get("rank")
+                or item.get("probability")
+            )
             description = item.get("description")
             line = usage
             if score is not None:
@@ -529,18 +554,19 @@ class LLMReportService:
             lines.append(line)
 
         return "\n".join(lines[:5])
+
     def _build_visual_prompt_section(self, map_images: Dict[str, str]) -> str:
         """
         LLM 프롬프트에 포함할 이미지 컨텍스트를 문자열로 만든다.
-        현재는 토큰 절약을 위해 위성사진 + 로드뷰1만 사용한다.
+        Base64는 포함하지 않고, 어떤 이미지가 함께 제공되는지만 설명한다.
         """
         lines: List[str] = []
         if map_images.get("satellite"):
-            lines.append("[위성사진_B64]")
-            lines.append(map_images["satellite"])
+            lines.append("- 위성사진 1장 제공")
         if map_images.get("streetview1"):
-            lines.append("[로드뷰1_B64]")
-            lines.append(map_images["streetview1"])
+            lines.append("- 현장사진(로드뷰1) 1장 제공")
+        if map_images.get("streetview2"):
+            lines.append("- 현장사진(로드뷰2) 1장 제공")
         return "\n".join(lines)
 
     def _summarise_stats_for_prompt(self, payload: Optional[Dict[str, Any]]) -> str:
@@ -583,7 +609,7 @@ class LLMReportService:
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
-    # 보고서 HTML 빌더
+    # HTML 빌더
     # ------------------------------------------------------------------
     def build_report_html(
         self,
@@ -628,8 +654,12 @@ class LLMReportService:
         else:
             usage_programs = None
 
-        environment_text = summary_text or "LLM 분석 결과를 불러오지 못했습니다. 기본 현황을 참고하세요."
-        investigation_text = investigation_raw or self._compose_investigation_section(insights, actions)
+        environment_text = (
+            summary_text or "LLM 분석 결과를 불러오지 못했습니다. 기본 현황을 참고하세요."
+        )
+        investigation_text = investigation_raw or self._compose_investigation_section(
+            insights, actions
+        )
         investigation_text = self._format_investigation_text(investigation_text)
 
         recommendation_html = self._render_rank_cards_structured(
@@ -637,7 +667,6 @@ class LLMReportService:
             usage_programs,
             fallback_reason_text=(detailed_usage_text or None),
         )
-
 
         stats_section = self._compose_stats_section(stats_payload)
 
@@ -651,7 +680,7 @@ class LLMReportService:
             land_use_name = str(item.get("name", "")).strip()
             if land_use_name and land_use_name not in land_use_names:
                 land_use_names.append(land_use_name)
-            if len(land_use_names) >= 5:
+            if len(land_use_names) >= 10:
                 break
         land_use_text = ", ".join(land_use_names) if land_use_names else "지목 정보 없음"
 
@@ -684,9 +713,13 @@ class LLMReportService:
             )
 
         if lat and lng and self.google_maps_api_key:
+            lat_f = float(lat)
+            lng_f = float(lng)
             try:
                 if not satellite_img:
-                    sat_b64 = self._fetch_satellite_image_b64(float(lat), float(lng), width=600, height=450, zoom=18)
+                    sat_b64 = self._fetch_satellite_image_b64(
+                        lat_f, lng_f, width=600, height=450, zoom=18
+                    )
                     if sat_b64:
                         satellite_img = (
                             f'<img src="data:image/jpeg;base64,{sat_b64}" '
@@ -698,9 +731,15 @@ class LLMReportService:
 
             try:
                 if not streetview1_img:
-                    rv1_b64 = self._fetch_streetview_image_b64(float(lat), float(lng),
-                                                               heading=0, pitch=0,
-                                                               width=600, height=450, fov=90)
+                    rv1_b64 = self._fetch_streetview_image_b64(
+                        lat_f,
+                        lng_f,
+                        heading=0,
+                        pitch=0,
+                        width=600,
+                        height=450,
+                        fov=90,
+                    )
                     if rv1_b64:
                         streetview1_img = (
                             f'<img src="data:image/jpeg;base64,{rv1_b64}" '
@@ -712,9 +751,15 @@ class LLMReportService:
 
             try:
                 if not streetview2_img:
-                    rv2_b64 = self._fetch_streetview_image_b64(float(lat), float(lng),
-                                                               heading=180, pitch=0,
-                                                               width=600, height=450, fov=90)
+                    rv2_b64 = self._fetch_streetview_image_b64(
+                        lat_f,
+                        lng_f,
+                        heading=180,
+                        pitch=0,
+                        width=600,
+                        height=450,
+                        fov=90,
+                    )
                     if rv2_b64:
                         streetview2_img = (
                             f'<img src="data:image/jpeg;base64,{rv2_b64}" '
@@ -726,7 +771,9 @@ class LLMReportService:
 
         # 기본값으로 terrain_html 사용 (위성사진이 없을 경우)
         if not satellite_img:
-            satellite_img = terrain_html if terrain_html else '<div class="placeholder">위성사진</div>'
+            satellite_img = (
+                terrain_html if terrain_html else '<div class="placeholder">위성사진</div>'
+            )
 
         # 로드뷰가 없을 경우 placeholder 사용
         if not streetview1_img:
@@ -734,12 +781,11 @@ class LLMReportService:
         if not streetview2_img:
             streetview2_img = '<div class="placeholder">현장사진(로드뷰2)</div>'
 
-
         return f"""
         <!DOCTYPE html>
-        <html lang=\"ko\">
+        <html lang="ko">
         <head>
-            <meta charset=\"utf-8\">
+            <meta charset="utf-8">
             <title>폐·휴업주유소실태조사보고서 - {station_name}</title>
             <style>
                 * {{ box-sizing: border-box; }}
@@ -754,7 +800,7 @@ class LLMReportService:
                     max-width: 1200px;
                     margin: 0 auto;
                     background: #fff;
-                    padding: 80px 80px 48px;      
+                    padding: 80px 80px 48px;
                     padding-left: 100px;
                     padding-right: 100px;
                     box-shadow: 0 10px 40px rgba(0,0,0,0.08);
@@ -771,13 +817,12 @@ class LLMReportService:
                 .date {{ text-align: center; color: #6b7280; margin-bottom: 24px; }}
                 .section {{ margin-top: 22px; }}
                 .section h2 {{
-                    font-size: 22px;         
-                    font-weight: 800;        /* 굵게 */
+                    font-size: 22px;
+                    font-weight: 800;
                     margin: 28px 0 14px 0;
                     padding-bottom: 6px;
                     display: inline-block;
                 }}
-
                 .basic-table {{
                     width: 100%;
                     border-collapse: collapse;
@@ -795,11 +840,9 @@ class LLMReportService:
                     text-align: center;
                     vertical-align: middle;
                 }}
-                /* 칼럼 폭 고정 (지도 / 라벨 / 값) */
                 .basic-table col.col-location {{ width: 260px; }}
                 .basic-table col.col-label    {{ width: 120px; }}
                 .basic-table col.col-value    {{ width: auto; }}
-                /* 위치도: 정사각형 빈칸 */
                 .basic-table .location-box {{
                     padding: 0;
                     background: #f0f2f5;
@@ -810,9 +853,8 @@ class LLMReportService:
                 .basic-table .location-box::before {{
                     content: "";
                     display: block;
-                    padding-top: 100%;  /* 1:1 비율 유지 */
+                    padding-top: 100%;
                 }}
-
                 .placeholder {{
                     height: 220px;
                     border-radius: 10px;
@@ -822,7 +864,6 @@ class LLMReportService:
                     color: #9ca3af;
                     font-size: 14px;
                 }}
-
                 .info-item {{
                     border: 1px solid #e5e7eb;
                     border-radius: 10px;
@@ -895,7 +936,6 @@ class LLMReportService:
                     font-size: 12px;
                     min-width: 86px;
                 }}
-                /* 추천 활용안에서 1순위/2순위/3순위 제목 */
                 .rank-title {{
                     display: inline-block;
                     font-size: 16px;
@@ -910,19 +950,9 @@ class LLMReportService:
                     font-weight: 700;
                     color: #111827;
                 }}
-
-                /* 첫 번째 1순위 제목은 윗 여백 0 */
                 .text-box .rank-title:first-of-type {{
                     margin-top: 0;
                 }}
-                .stats-table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
-                .stats-table th, .stats-table td {{
-                    border: 1px solid #e5e7eb;
-                    padding: 8px 10px;
-                    text-align: left;
-                }}
-                .stats-table th {{ background: #f3f4f6; }}
-                                /* 리포트용 요약 지표 박스 */
                 .metrics-section {{
                     border: 1px solid #e5e7eb;
                     border-radius: 12px;
@@ -1085,22 +1115,20 @@ class LLMReportService:
                 .subtle {{ color: #9ca3af; font-size: 13px; }}
                 .photo-grid {{
                     display: grid;
-                    grid-template-columns: repeat(3, 1fr);  /* 3등분 */
+                    grid-template-columns: repeat(3, 1fr);
                     gap: 10px;
                     margin-top: 12px;
                 }}
-
                 .photo-item {{
                     border: 1px solid #e5e7eb;
                     border-radius: 10px;
                     background: #fafafa;
-                    height: 260px;                /* 고정 높이 */
+                    height: 260px;
                     overflow: hidden;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                 }}
-
                 .photo-caption {{
                     display: grid;
                     grid-template-columns: repeat(3, 1fr);
@@ -1127,7 +1155,6 @@ class LLMReportService:
                 .print-button:hover {{
                     background: #f3f4f6;
                 }}
-                /* 👉 인쇄(PDF)용 스타일 */
                 @media print {{
                     .bar,
                     .bar.negative {{
@@ -1156,7 +1183,6 @@ class LLMReportService:
                     border-radius: 10px;
                     overflow: hidden;
                 }}
-
                 .basic-table .location-map-inner #report-map {{
                     width: 100%;
                     height: 100%;
@@ -1170,10 +1196,10 @@ class LLMReportService:
         <body>
             <button class="print-button" onclick="window.print()">PDF 출력</button>
 
-            <article class=\"report\">
+            <article class="report">
                 <header>
-                    <div class=\"title\">폐·휴업주유소실태조사보고서</div>
-                    <div class=\"date\">작성일시: {report_date.strftime('%Y-%m-%d %H:%M')}</div>
+                    <div class="title">폐·휴업주유소실태조사보고서</div>
+                    <div class="date">작성일시: {report_date.strftime('%Y-%m-%d %H:%M')}</div>
                 </header>
 
                 <section class="section">
@@ -1187,7 +1213,6 @@ class LLMReportService:
                             <col class="col-value">
                         </colgroup>
                         <tr>
-                            <!-- 위치도 들어갈 정사각형 칸 -->
                             <td class="location-box" rowspan="6">
                                 <div class="location-map-inner">
                                     {map_html}
@@ -1222,20 +1247,17 @@ class LLMReportService:
                     <p class="subtle">좌표: {coords_text}</p>
                 </section>
 
-
-                <section class=\"section\">
+                <section class="section">
                     <h2>2. 조사 현황</h2>
-                    <div class=\"text-box\">{investigation_text}</div>
+                    <div class="text-box">{investigation_text}</div>
                 </section>
 
                 <section class="section">
-
                     <div class="photo-grid">
                         <div class="photo-item">{satellite_img}</div>
                         <div class="photo-item">{streetview1_img}</div>
                         <div class="photo-item">{streetview2_img}</div>
                     </div>
-
                     <div class="photo-caption">
                         <div>위성사진</div>
                         <div>현장사진(로드뷰1)</div>
@@ -1243,34 +1265,30 @@ class LLMReportService:
                     </div>
                 </section>
 
-                <section class=\"section\">
+                <section class="section">
                     <h2>3. 분석 지표</h2>
                     {stats_section}
                 </section>
 
-                <section class=\"section\"> 
+                <section class="section">
                     <h2>4. 추천 활용안</h2>
                     {recommendation_html}
                 </section>
 
-                <section class=\"section\">
+                <section class="section">
                     <h2>5. 지적도</h2>
-                    <div class=\"info-grid\">
-                        <div class=\"info-item\"><div class=\"placeholder\">지적도 이미지</div></div>
+                    <div class="info-grid">
+                        <div class="info-item"><div class="placeholder">지적도 이미지</div></div>
                     </div>
                 </section>
             </article>
         </body>
         </html>
         """
-        """
-        '1순위: XXX' 같은 텍스트를
-        <span class="rank-title">1순위: XXX</span> 으로 변환해주는 후처리 유틸 함수.
-        """
-        pattern = r"(\d+순위\s*:\s*[^\n]+)"
-        return re.sub(pattern, r'<span class="rank-title">\1</span>', text)
 
-
+    # ------------------------------------------------------------------
+    # 조사/추천 관련 유틸
+    # ------------------------------------------------------------------
     def _compose_investigation_section(self, insights: List[str], actions: List[str]) -> str:
         bullets: List[str] = []
         if insights:
@@ -1285,27 +1303,24 @@ class LLMReportService:
         """조사 현황 텍스트를 불릿 포인트로 포맷팅한다."""
         if not text:
             return "LLM 조사 결과를 수집하지 못했습니다. 현장 확인 후 업데이트하세요."
-        
+
         normalized = re.sub(r"\r\n?", "\n", str(text)).strip()
         lines = [line.strip() for line in normalized.split("\n") if line.strip()]
-        
-        # 줄바꿈이 없으면 문장 단위로 분리
+
         if len(lines) == 1:
-            # 마침표 기준으로 문장 분리
-            sentences = re.split(r'(?<=[.!?])\s+(?=[가-힣A-Z])', lines[0])
+            sentences = re.split(r"(?<=[.!?])\s+(?=[가-힣A-Z])", lines[0])
             lines = [s.strip() for s in sentences if s.strip()]
-        
+
         if not lines:
             return "LLM 조사 결과를 수집하지 못했습니다. 현장 확인 후 업데이트하세요."
-        
+
         bullet_prefix = re.compile(r"^[•\-\u2022●]\s*")
         formatted_lines = []
         for line in lines:
             cleaned = bullet_prefix.sub("", line).strip()
             formatted_lines.append(f"• {cleaned}")
-        
-        return "\n".join(formatted_lines)  # \n\n 대신 \n 사용
 
+        return "\n".join(formatted_lines)
 
     def _render_program_entries(
         self, programs: List[Dict[str, Any]], fallback_reason: str
@@ -1479,8 +1494,6 @@ class LLMReportService:
 
         return '<div class="rank-grid">' + "".join(cards) + "</div>"
 
-
-
     def _compose_stats_section(self, payload: Optional[Dict[str, Any]]) -> str:
         metrics = (payload or {}).get("metrics") or {}
         relative = (payload or {}).get("relative") or {}
@@ -1589,31 +1602,31 @@ class LLMReportService:
         grid_levels = [100, 70, 40]
         grid_polygons = "".join(
             (
-                "<polygon class=\"radar-bg-line\" points=\""
+                '<polygon class="radar-bg-line" points="'
                 + " ".join(
                     _polar_to_cart(idx, level, len(ordered_keys))
                     for idx in range(len(ordered_keys))
                 )
-                + "\"></polygon>"
+                + '"></polygon>'
             )
             for level in grid_levels
         )
 
         axis_lines = "".join(
-            f"<line class=\"radar-axis\" x1=\"120\" y1=\"120\" x2=\"{_polar_to_cart(idx, 100, len(ordered_keys)).split(',')[0]}\" y2=\"{_polar_to_cart(idx, 100, len(ordered_keys)).split(',')[1]}\"></line>"
+            f'<line class="radar-axis" x1="120" y1="120" x2="{_polar_to_cart(idx, 100, len(ordered_keys)).split(",")[0]}" y2="{_polar_to_cart(idx, 100, len(ordered_keys)).split(",")[1]}"></line>'
             for idx in range(len(ordered_keys))
         )
 
         labels_svg = "".join(
-            f"<text class=\"radar-label\" x=\"{_label_position(idx, len(ordered_keys)).split(',')[0]}\" y=\"{_label_position(idx, len(ordered_keys)).split(',')[1]}\">{label_map[key]}</text>"
+            f'<text class="radar-label" x="{_label_position(idx, len(ordered_keys)).split(",")[0]}" y="{_label_position(idx, len(ordered_keys)).split(",")[1]}">{label_map[key]}</text>'
             for idx, key in enumerate(ordered_keys)
         )
 
         radar_svg = f"""
-            <svg viewBox=\"0 0 240 240\" aria-label=\"입지 지표 레이더 차트\">
+            <svg viewBox="0 0 240 240" aria-label="입지 지표 레이더 차트">
                 {grid_polygons}
                 {axis_lines}
-                <polygon class=\"radar-area\" points=\"{radar_points}\"></polygon>
+                <polygon class="radar-area" points="{radar_points}"></polygon>
                 {labels_svg}
             </svg>
         """
@@ -1644,6 +1657,9 @@ class LLMReportService:
             radar_svg=radar_svg,
         )
 
+    # ------------------------------------------------------------------
+    # 숫자/이미지 유틸
+    # ------------------------------------------------------------------
     @staticmethod
     def _is_number(val: Any) -> bool:
         try:
@@ -1683,6 +1699,30 @@ class LLMReportService:
             print(f"[StaticMap] 호출 실패: {e}")
             return None
 
+    def _streetview_has_imagery(self, lat: float, lng: float) -> bool:
+        """
+        Street View 메타데이터를 조회해 실제 로드뷰 이미지가 있는지 확인한다.
+        imagery가 없으면 'Sorry, we have no imagery here.' 타일이 나오므로
+        그런 경우는 LLM/HTML에 전달하지 않는다.
+        """
+        if not self.google_maps_api_key:
+            return False
+
+        meta_url = "https://maps.googleapis.com/maps/api/streetview/metadata"
+        params = {
+            "location": f"{lat},{lng}",
+            "key": self.google_maps_api_key,
+        }
+
+        try:
+            r = requests.get(meta_url, params=params, timeout=5)
+            r.raise_for_status()
+            data = r.json()
+            return data.get("status") == "OK"
+        except Exception as e:
+            print(f"[StreetView metadata] 조회 실패: {e}")
+            return False
+
     def _fetch_streetview_image_b64(
         self,
         lat: float,
@@ -1695,8 +1735,13 @@ class LLMReportService:
     ) -> Optional[str]:
         """
         Google Street View Static API를 호출해 로드뷰 이미지를 Base64 문자열로 반환.
+        imagery가 없으면 None을 반환한다.
         """
         if not self.google_maps_api_key:
+            return None
+
+        if not self._streetview_has_imagery(lat, lng):
+            print("[StreetView] 해당 위치에 로드뷰 없음")
             return None
 
         base_url = "https://maps.googleapis.com/maps/api/streetview"
@@ -1716,56 +1761,3 @@ class LLMReportService:
         except Exception as e:
             print(f"[StreetView] 호출 실패(heading={heading}): {e}")
             return None
-
-        """
-        Google Street View Static API를 호출해 로드뷰 이미지를 Base64 문자열로 반환.
-        """
-        if not self.google_maps_api_key:
-            return None
-
-        base_url = "https://maps.googleapis.com/maps/api/streetview"
-        params = {
-            "location": f"{lat},{lng}",
-            "size": f"{width}x{height}",
-            "heading": str(heading),
-            "pitch": str(pitch),
-            "fov": str(fov),
-            "key": self.google_maps_api_key,
-        }
-
-        try:
-            r = requests.get(base_url, params=params, timeout=10)
-            r.raise_for_status()
-            return base64.b64encode(r.content).decode("utf-8")
-        except Exception as e:
-            print(f"[StreetView] 호출 실패(heading={heading}): {e}")
-            return None
-
-        """
-        Google Street View Static API를 사용하여 로드뷰 이미지 URL을 생성합니다.
-
-        Args:
-            lat: 위도
-            lng: 경도
-            heading: 카메라 방향 (0-360, 0=북쪽, 90=동쪽, 180=남쪽, 270=서쪽)
-            pitch: 카메라 상하 각도 (-90 ~ 90, 0=수평)
-            width: 이미지 너비
-            height: 이미지 높이
-            fov: 시야각 (10-120도)
-
-        Returns:
-            로드뷰 이미지 URL
-        """
-        if not self.google_maps_api_key:
-            return ""
-
-        base_url = "https://maps.googleapis.com/maps/api/streetview"
-        params = [
-            f"location={lat},{lng}",
-            f"size={width}x{height}",
-            f"heading={heading}",
-            f"pitch={pitch}",
-            f"fov={fov}",
-            f"key={self.google_maps_api_key}",
-        ]
-        return f"{base_url}?{'&'.join(params)}"
