@@ -1275,13 +1275,15 @@ class LLMReportService:
                     {recommendation_html}
                 </section>
 
-                # <section class="section">
-                #     <h2>5. 지적도</h2>
-                #     <div class="info-grid">
-                #         <div class="info-item"><div class="placeholder">지적도 이미지</div></div>
-                #     </div>
-                # </section>
-                
+                <!-- 지적도 주석처리
+                <section class="section">
+                    <h2>5. 지적도</h2>
+                    <div class="info-grid">
+                        <div class="info-item"><div class="placeholder">지적도 이미지</div></div>
+                    </div>
+                </section>
+                -->
+
             </article>
         </body>
         </html>
