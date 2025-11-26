@@ -191,27 +191,17 @@ class LLMReportService:
             "당신은 도시 재생 및 부동산 활용 전략을 제시하는 컨설턴트입니다. 아래 주유소 정보를 분석하여 "
             "입지 특성 요약(2~3문장), 조사 현황(로드뷰·분석 지표 기반 3줄 내외 불릿), 권장 실행 항목 3개, "
             "그리고 세부 추천 활용안을 JSON으로만 응답하세요.\n"
-            "summary는 위성사진과 주유소 위치를 근거로 주변환경을 묘사하고, investigation은 로드뷰 2장과 "
+            "summary는 위성사진과 주유소 위치를 근거로 주변환경을 묘사하고, investigation은 로드뷰와 "
             "분석 지표(비중 높게 반영)를 근거로 현장 상태를 설명하는 불릿 텍스트로 작성합니다.\n"
             "**중요**: investigation은 반드시 줄바꿈(\\n)으로 구분된 3개의 불릿 항목으로 작성하세요. "
             "각 불릿 항목은 한 문장으로 구성하고, 불릿 기호(•, -)는 포함하지 마세요. 줄바꿈만으로 구분합니다.\n"
-            "JSON 키는 summary(문장), investigation(멀티라인 문자열), actions(문장 리스트), detailed_usage(문자열)입니다.\n"
+            "JSON 키는 summary(문장), investigation(멀티라인 문자열), actions(문장 리스트), usage_programs(리스트)입니다.\n"
             "\n"
-            "**detailed_usage 작성 규칙**:\n"
-            "- 반드시 아래 [추천 활용 방안]에 제공된 데이터를 기반으로 1순위, 2순위, 3순위를 작성하세요.\n"
-            "- 각 순위는 [추천 활용 방안]의 순서대로 사용하세요 (1순위=첫 번째 항목, 2순위=두 번째 항목, 3순위=세 번째 항목).\n"
-            "- 각 순위별로 3개의 세부 프로그램을 제안하고, 프로그램명과 선정 이유(2~3문장)를 작성하세요.\n"
-            "- 형식: '순위: 용도명\\n- 프로그램명\\n선정이유1\\n- 프로그램명\\n선정이유2\\n- 프로그램명\\n선정이유3'\n"
-            "\n"
-            "형식 예시 (실제 내용은 [추천 활용 방안] 데이터를 사용):\n"
-            "1순위: [첫 번째 추천 용도]\n"
-            "- [해당 용도에 맞는 세부 프로그램명(예시: 카페)]\n[선정 이유 2~3문장]\n"
-            "- [해당 용도에 맞는 세부 프로그램명]\n[선정 이유 2~3문장]\n"
-            "- [해당 용도에 맞는 세부 프로그램명]\n[선정 이유 2~3문장]\n"
-            "2순위: [두 번째 추천 용도]\n"
-            "...\n"
-            "3순위: [세 번째 추천 용도]\n"
-            "...\n"
+            "**usage_programs 작성 규칙**:\n"
+            "- 반드시 아래 [추천 활용 방안]에 제공된 순서와 명칭(1~3순위)을 그대로 사용하세요. 임의로 변경하거나 새로운 순위를 만들지 마세요.\n"
+            "- 각 항목은 {\"usage\":\"[추천 용도]\", \"rank\":순번, \"programs\":[{\"name\":\"프로그램명\", \"reason\":\"선정 이유 2~3문장\"}, ...]} 형식의 JSON 객체로 작성하세요.\n"
+            "- 각 순위별로 프로그램은 정확히 3개를 작성하고, 선정 이유는 2~3문장으로 서술하되 불릿/개행 없이 문장만 포함합니다.\n"
+            "- usage에는 제공된 추천 용도명을 그대로 입력하고, programs 배열 외의 여분 텍스트나 마크다운은 추가하지 마세요.\n"
             "\n"
             "모든 문장은 한국어 비즈니스 보고서 어투로 작성하고, JSON 이외의 다른 설명이나 마크다운은 포함하지 마세요.\n"
             "추천 활용안은 위성사진, 로드뷰, 분석 지표 내용을 모두 참고하되 분석 지표에 가장 높은 비중을 두세요.\n\n"
@@ -344,8 +334,9 @@ class LLMReportService:
         actions = [str(item).strip() for item in data.get("actions", []) if str(item).strip()]
         investigation = str(data.get("investigation", "") or data.get("investigation_text", "")).strip()
         detailed_usage = str(data.get("detailed_usage", "") or data.get("recommendations_text", "")).strip()
+        usage_programs = data.get("usage_programs") or data.get("programs") or data.get("usage_details")
 
-        if not summary and not insights and not actions and not detailed_usage and not investigation:
+        if not summary and not insights and not actions and not detailed_usage and not investigation and not usage_programs:
             return None
 
         return {
@@ -354,6 +345,7 @@ class LLMReportService:
             "actions": actions,
             "investigation": investigation,
             "detailed_usage": detailed_usage,
+            "usage_programs": usage_programs,
         }
 
 
@@ -437,9 +429,6 @@ class LLMReportService:
             "actions": actions,
         }
 
-    def _describe_parcel_summary(
-        self, parcel_summary: Optional[Dict[str, Any]]
-    ) -> Optional[str]:
         if not parcel_summary:
             return None
 
@@ -540,8 +529,11 @@ class LLMReportService:
             lines.append(line)
 
         return "\n".join(lines[:5])
-
     def _build_visual_prompt_section(self, map_images: Dict[str, str]) -> str:
+        """
+        LLM 프롬프트에 포함할 이미지 컨텍스트를 문자열로 만든다.
+        현재는 토큰 절약을 위해 위성사진 + 로드뷰1만 사용한다.
+        """
         lines: List[str] = []
         if map_images.get("satellite"):
             lines.append("[위성사진_B64]")
@@ -549,9 +541,6 @@ class LLMReportService:
         if map_images.get("streetview1"):
             lines.append("[로드뷰1_B64]")
             lines.append(map_images["streetview1"])
-        if map_images.get("streetview2"):
-            lines.append("[로드뷰2_B64]")
-            lines.append(map_images["streetview2"])
         return "\n".join(lines)
 
     def _summarise_stats_for_prompt(self, payload: Optional[Dict[str, Any]]) -> str:
@@ -614,7 +603,7 @@ class LLMReportService:
         """주어진 데이터로 폐·휴업 주유소 실태조사 보고서 HTML을 만든다."""
 
         report_date = report_date or datetime.now()
-        name = station.get("상호") or station.get("name") or "주유소"
+        station_name = station.get("상호") or station.get("name") or "주유소"
         address = station.get("주소") or station.get("지번주소") or "주소 정보 없음"
         lat = station.get("위도")
         lng = station.get("경도")
@@ -635,21 +624,19 @@ class LLMReportService:
                 or llm_report.get("recommendations_text")
                 or ""
             )
+            usage_programs = llm_report.get("usage_programs")
+        else:
+            usage_programs = None
 
         environment_text = summary_text or "LLM 분석 결과를 불러오지 못했습니다. 기본 현황을 참고하세요."
         investigation_text = investigation_raw or self._compose_investigation_section(insights, actions)
         investigation_text = self._format_investigation_text(investigation_text)
 
-        # LLM이 detailed_usage를 돌려주면 그대로 활용안 섹션에 사용
-        if detailed_usage_text:
-            recommendation_blocks = self._split_rank_blocks(detailed_usage_text)
-        else:
-            # LLM 실패 시에만 간단한 정적 요약 사용
-            base_text = self._compose_recommendations(recommendations)
-            recommendation_blocks = self._split_rank_blocks(base_text)
-
-        recommendation_blocks = [self._decorate_rank_titles(b) for b in recommendation_blocks]
-        recommendation_html = self._render_rank_boxes(recommendation_blocks)
+        recommendation_html = self._render_rank_cards_structured(
+            recommendations,
+            usage_programs,
+            fallback_reason_text=(detailed_usage_text or None),
+        )
 
 
         stats_section = self._compose_stats_section(stats_payload)
@@ -661,9 +648,9 @@ class LLMReportService:
         land_use_raw = ((land_payload or {}).get("land_use") or {}).get("raw") or []
         land_use_names: List[str] = []
         for item in land_use_raw:
-            name = str(item.get("name", "")).strip()
-            if name and name not in land_use_names:
-                land_use_names.append(name)
+            land_use_name = str(item.get("name", "")).strip()
+            if land_use_name and land_use_name not in land_use_names:
+                land_use_names.append(land_use_name)
             if len(land_use_names) >= 5:
                 break
         land_use_text = ", ".join(land_use_names) if land_use_names else "지목 정보 없음"
@@ -753,7 +740,7 @@ class LLMReportService:
         <html lang=\"ko\">
         <head>
             <meta charset=\"utf-8\">
-            <title>폐·휴업주유소실태조사보고서 - {name}</title>
+            <title>폐·휴업주유소실태조사보고서 - {station_name}</title>
             <style>
                 * {{ box-sizing: border-box; }}
                 body {{
@@ -1190,7 +1177,7 @@ class LLMReportService:
                             <!-- 위치도 들어갈 정사각형 칸 -->
                             <td class="location-box" rowspan="6"></td>
                             <th class="label">주유소 이름</th>
-                            <td colspan="3">{name}</td>
+                            <td colspan="3">{station_name}</td>
                         </tr>
                         <tr>
                             <th class="label">상태</th>
@@ -1259,7 +1246,6 @@ class LLMReportService:
         </body>
         </html>
         """
-    def _decorate_rank_titles(self, text: str) -> str:
         """
         '1순위: XXX' 같은 텍스트를
         <span class="rank-title">1순위: XXX</span> 으로 변환해주는 후처리 유틸 함수.
@@ -1304,45 +1290,166 @@ class LLMReportService:
         return "\n".join(formatted_lines)  # \n\n 대신 \n 사용
 
 
-    def _split_rank_blocks(self, text: str) -> List[str]:
-        """1순위/2순위/3순위 블록 단위로 텍스트를 분리한다."""
+    def _render_program_entries(
+        self, programs: List[Dict[str, Any]], fallback_reason: str
+    ) -> str:
+        """세부 프로그램명을 안정적으로 카드 형태로 변환한다."""
 
-        if not text:
-            return []
+        entries: List[str] = []
 
-        pattern = re.compile(r"(\d+순위\s*:[^\n]*)")
-        matches = list(pattern.finditer(text))
-        if not matches:
-            return [text.strip()]
-
-        blocks: List[str] = []
-        for idx, match in enumerate(matches):
-            start = match.start()
-            end = matches[idx + 1].start() if idx + 1 < len(matches) else len(text)
-            block = text[start:end].strip()
-            if block:
-                blocks.append(block)
-        return blocks
-
-
-    def _render_rank_boxes(self, blocks: List[str]) -> str:
-        if not blocks:
-            return '<div class="text-box">추천 활용안을 불러오지 못했습니다.</div>'
-
-        cards = []
-        for block in blocks:
-            lines = [line.strip() for line in block.splitlines() if line.strip()]
-            if not lines:
+        cleaned_programs: List[Dict[str, str]] = []
+        for item in programs or []:
+            if not isinstance(item, dict):
                 continue
 
-            title = lines[0]
-            body_text = "\n".join(lines[1:]).strip()
-            body_html = (
-                self._format_usage_body(body_text)
-                if body_text
-                else "<div class=\"usage-line\">세부 내용이 없습니다.</div>"
+            program_name = (
+                str(
+                    item.get("name")
+                    or item.get("program")
+                    or item.get("title")
+                    or item.get("label")
+                    or ""
+                ).strip()
+            )
+            reason_text = str(
+                item.get("reason")
+                or item.get("description")
+                or item.get("detail")
+                or ""
+            ).strip()
+
+            if not program_name and not reason_text:
+                continue
+
+            cleaned_programs.append(
+                {
+                    "name": program_name or "세부 프로그램",
+                    "reason": reason_text or fallback_reason,
+                }
             )
 
+            if len(cleaned_programs) >= 3:
+                break
+
+        if not cleaned_programs:
+            cleaned_programs = [
+                {"name": "세부 프로그램 제안 필요", "reason": fallback_reason}
+            ]
+
+        for entry in cleaned_programs:
+            entries.append(
+                "".join(
+                    [
+                        '<div class="usage-line">',
+                        f'<div class="reason-label">{entry["name"]}</div>',
+                        f'<div>• {entry["reason"]}</div>',
+                        "</div>",
+                    ]
+                )
+            )
+
+        return "".join(entries)
+
+    def _normalise_usage_programs(
+        self, raw_data: Any
+    ) -> tuple[Dict[str, List[Dict[str, Any]]], Dict[int, List[Dict[str, Any]]]]:
+        """LLM이 반환한 usage_programs를 용도/순위 기준으로 정리한다."""
+
+        usage_map: Dict[str, List[Dict[str, Any]]] = {}
+        rank_map: Dict[int, List[Dict[str, Any]]] = {}
+
+        def _coerce_programs(value: Any) -> List[Dict[str, Any]]:
+            if isinstance(value, dict):
+                value = value.get("programs") or value.get("details") or value.get("items")
+
+            if not isinstance(value, list):
+                return []
+
+            programs: List[Dict[str, Any]] = []
+            for item in value:
+                if isinstance(item, dict):
+                    programs.append(item)
+            return programs
+
+        if isinstance(raw_data, dict):
+            for key, value in raw_data.items():
+                programs = _coerce_programs(value)
+                if not programs:
+                    continue
+
+                if self._is_number(key):
+                    try:
+                        rank_map[int(float(key))] = programs
+                    except Exception:
+                        continue
+                else:
+                    usage_map[str(key).strip().lower()] = programs
+
+        elif isinstance(raw_data, list):
+            for item in raw_data:
+                if not isinstance(item, dict):
+                    continue
+
+                programs = _coerce_programs(
+                    item.get("programs")
+                    or item.get("items")
+                    or item.get("details")
+                    or item.get("sub_programs")
+                )
+                if not programs:
+                    continue
+
+                usage_key = (
+                    item.get("usage")
+                    or item.get("usage_type")
+                    or item.get("category")
+                    or item.get("title")
+                )
+                rank_key = item.get("rank")
+
+                if usage_key:
+                    usage_map[str(usage_key).strip().lower()] = programs
+
+                if self._is_number(rank_key):
+                    try:
+                        rank_map[int(float(rank_key))] = programs
+                    except Exception:
+                        continue
+
+        return usage_map, rank_map
+
+    def _render_rank_cards_structured(
+        self,
+        recommendations: List[Dict[str, Any]],
+        usage_programs: Any,
+        *,
+        fallback_reason_text: Optional[str] = None,
+    ) -> str:
+        """추천 API 순위에 맞춰 카드형 활용안을 안정적으로 렌더링한다."""
+
+        if not recommendations:
+            return '<div class="text-box">추천 활용안을 불러오지 못했습니다.</div>'
+
+        programs_by_usage, programs_by_rank = self._normalise_usage_programs(usage_programs)
+
+        cards: List[str] = []
+        for idx, item in enumerate(recommendations[:3], start=1):
+            usage = (
+                item.get("type")
+                or item.get("usage_type")
+                or item.get("category")
+                or "제안 용도"
+            )
+
+            normalized_usage = str(usage).strip().lower()
+            programs = programs_by_usage.get(normalized_usage) or programs_by_rank.get(idx) or []
+            fallback_reason = (
+                (item.get("detail") or item.get("description") or item.get("note") or "").strip()
+                or (fallback_reason_text or "세부 선정 이유는 추후 보완이 필요합니다.")
+            )
+
+            body_html = self._render_program_entries(programs, fallback_reason)
+            title = f"{idx}순위: {usage}"
             cards.append(
                 f"<div class=\"rank-card\">"
                 f"<div class=\"rank-card-header\"><span class=\"rank-title\">{title}</span></div>"
@@ -1354,105 +1461,6 @@ class LLMReportService:
             return '<div class="text-box">추천 활용안을 불러오지 못했습니다.</div>'
 
         return '<div class="rank-grid">' + "".join(cards) + "</div>"
-
-    def _format_usage_body(self, text: str) -> str:
-        """각 프로그램명과 선정 이유를 카드 형태로 재구성한다."""
-
-        if not text:
-            return ""
-
-        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-        entries: List[Tuple[str, str]] = []
-        current_label: Optional[str] = None
-        current_reason: List[str] = []
-        bullet_pattern = re.compile(r"^[-•●]\s*(.+)")
-
-        for line in lines:
-            if re.match(r"\d+순위\s*:", line):
-                # 상위 제목은 이미 별도로 렌더링됨
-                continue
-
-            bullet_match = bullet_pattern.match(line)
-            if bullet_match:
-                # 이전 엔트리 저장
-                if current_label or current_reason:
-                    entries.append(
-                        (
-                            current_label or "세부안",
-                            "\n".join(current_reason).strip() or "선정 이유가 제공되지 않았습니다.",
-                        )
-                    )
-                current_label = bullet_match.group(1).strip()
-                current_reason = []
-                continue
-
-            if current_label is None:
-                current_label = line
-                continue
-
-            current_reason.append(line)
-
-        if current_label or current_reason:
-            entries.append(
-                (
-                    current_label or "세부안",
-                    "\n".join(current_reason).strip() or "선정 이유가 제공되지 않았습니다.",
-                )
-            )
-
-        if not entries:
-            return '<div class="usage-line"><div class="reason-label">세부안</div><div>• 선정 이유가 제공되지 않았습니다.</div></div>'
-
-        parts = []
-        for label, reason in entries:
-            parts.append(
-                "".join(
-                    [
-                        '<div class="usage-line">',
-                        f'<div class="reason-label">{label}</div>',
-                        f'<div>• {reason}</div>',
-                        "</div>",
-                    ]
-                )
-            )
-
-        return "".join(parts)
-
-    def _compose_recommendations(self, recommendations: List[Dict[str, Any]]) -> str:
-        """
-        추천 활용안 섹션 텍스트 구성.
-        1순위 / 2순위 / 3순위 제목은 .rank-title 로 감싸서 굵게 표시.
-        LLM이 생성한 세부 설명은 그대로 줄바꿈 유지.
-        """
-        if not recommendations:
-            return "추천 활용안을 불러오지 못했습니다."
-
-        blocks: List[str] = []
-
-        for idx, item in enumerate(recommendations[:3], start=1):
-            usage = item.get("type") or item.get("usage_type") or item.get("category") or "제안 용도"
-            detail = (item.get("detail") or item.get("description") or "").strip()
-
-            # 제목은 굵게/크게
-            lines: List[str] = [f'<span class="rank-title">{idx}순위: {usage}</span>']
-
-            reason_text = detail or "세부 선정 이유는 추후 보완이 필요합니다."
-            lines.append(f"- {usage}\n{reason_text}")
-
-            blocks.append("\n".join(lines))
-
-        # 4~5순위가 있다면 한 줄로만 추가 검토 용도로 표시
-        if len(recommendations) > 3:
-            extra = [
-                (item.get("type") or item.get("usage_type") or item.get("category"))
-                for item in recommendations[3:5]
-                if (item.get("type") or item.get("usage_type") or item.get("category"))
-            ]
-            if extra:
-                blocks.append("추가 검토 대상: " + ", ".join(extra))
-
-        # text-box 에서 white-space: pre-line 이라 \n 기준으로 자연스럽게 줄바꿈됨
-        return "\n\n".join(blocks)
 
 
 
@@ -1668,6 +1676,30 @@ class LLMReportService:
         height: int = 480,
         fov: int = 90,
     ) -> Optional[str]:
+        """
+        Google Street View Static API를 호출해 로드뷰 이미지를 Base64 문자열로 반환.
+        """
+        if not self.google_maps_api_key:
+            return None
+
+        base_url = "https://maps.googleapis.com/maps/api/streetview"
+        params = {
+            "location": f"{lat},{lng}",
+            "size": f"{width}x{height}",
+            "heading": str(heading),
+            "pitch": str(pitch),
+            "fov": str(fov),
+            "key": self.google_maps_api_key,
+        }
+
+        try:
+            r = requests.get(base_url, params=params, timeout=10)
+            r.raise_for_status()
+            return base64.b64encode(r.content).decode("utf-8")
+        except Exception as e:
+            print(f"[StreetView] 호출 실패(heading={heading}): {e}")
+            return None
+
         """
         Google Street View Static API를 호출해 로드뷰 이미지를 Base64 문자열로 반환.
         """
