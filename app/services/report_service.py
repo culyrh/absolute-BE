@@ -1663,6 +1663,21 @@ class LLMReportService:
     # ------------------------------------------------------------------
     # 숫자/이미지 유틸
     # ------------------------------------------------------------------
+    def _compute_heading(
+        self, src_lat: float, src_lng: float, dst_lat: float, dst_lng: float
+    ) -> int:
+        import math
+        phi1 = math.radians(src_lat)
+        phi2 = math.radians(dst_lat)
+        d_lambda = math.radians(dst_lng - src_lng)
+
+        y = math.sin(d_lambda) * math.cos(phi2)
+        x = math.cos(phi1) * math.sin(phi2) - math.sin(phi1) * math.cos(phi2) * math.cos(d_lambda)
+
+        bearing = math.degrees(math.atan2(y, x))
+        heading = (bearing + 360.0) % 360.0
+        return int(round(heading))
+
     @staticmethod
     def _is_number(val: Any) -> bool:
         try:
@@ -1702,30 +1717,29 @@ class LLMReportService:
             print(f"[StaticMap] 호출 실패: {e}")
             return None
 
-    def _streetview_has_imagery(self, lat: float, lng: float) -> bool:
-        """
-        Street View 메타데이터를 조회해 실제 로드뷰 이미지가 있는지 확인한다.
-        imagery가 없으면 'Sorry, we have no imagery here.' 타일이 나오므로
-        그런 경우는 LLM/HTML에 전달하지 않는다.
-        """
-        if not self.google_maps_api_key:
-            return False
+    # def _streetview_has_imagery(self, lat: float, lng: float) -> bool:
+    #     """
+    #     Street View 메타데이터를 조회해 실제 로드뷰 이미지가 있는지 확인한다.
+    #     imagery가 없으면 'Sorry, we have no imagery here.' 타일이 나오므로
+    #     그런 경우는 LLM/HTML에 전달하지 않는다.
+    #     """
+    #     if not self.google_maps_api_key:
+    #         return False
 
-        meta_url = "https://maps.googleapis.com/maps/api/streetview/metadata"
-        params = {
-            "location": f"{lat},{lng}",
-            "key": self.google_maps_api_key,
-        }
+    #     meta_url = "https://maps.googleapis.com/maps/api/streetview/metadata"
+    #     params = {
+    #         "location": f"{lat},{lng}",
+    #         "key": self.google_maps_api_key,
+    #     }
 
-        try:
-            r = requests.get(meta_url, params=params, timeout=5)
-            r.raise_for_status()
-            data = r.json()
-            return data.get("status") == "OK"
-        except Exception as e:
-            print(f"[StreetView metadata] 조회 실패: {e}")
-            return False
-
+    #     try:
+    #         r = requests.get(meta_url, params=params, timeout=5)
+    #         r.raise_for_status()
+    #         data = r.json()
+    #         return data.get("status") == "OK"
+    #     except Exception as e:
+    #         print(f"[StreetView metadata] 조회 실패: {e}")
+    #         return False
     def _fetch_streetview_image_b64(
         self,
         lat: float,
@@ -1738,24 +1752,70 @@ class LLMReportService:
     ) -> Optional[str]:
         """
         Google Street View Static API를 호출해 로드뷰 이미지를 Base64 문자열로 반환.
-        imagery가 없으면 None을 반환한다.
+
+        - metadata API로 주변에서 pano를 찾아보고(있으면 그 좌표/ID 사용)
+        - metadata가 실패하거나 ZERO_RESULTS여도 한 번은 좌표 기준으로 그대로 요청해 본다.
         """
         if not self.google_maps_api_key:
             return None
 
-        if not self._streetview_has_imagery(lat, lng):
-            print("[StreetView] 해당 위치에 로드뷰 없음")
-            return None
+        meta_url = "https://maps.googleapis.com/maps/api/streetview/metadata"
+        pano_lat = lat
+        pano_lng = lng
+        pano_id: Optional[str] = None
+
+        # 1) 메타데이터로 주변 도로 쪽 pano 찾기 (road bias)
+        try:
+            meta_params = {
+                "location": f"{lat},{lng}",
+                "radius": 120,         # 50m → 120m로 조금 더 완화
+                "source": "outdoor",   # 실외 이미지 우선
+                "key": self.google_maps_api_key,
+            }
+            r_meta = requests.get(meta_url, params=meta_params, timeout=5)
+            r_meta.raise_for_status()
+            meta = r_meta.json()
+
+            status = meta.get("status")
+            if status == "OK":
+                loc = meta.get("location") or {}
+                pano_lat = float(loc.get("lat", lat))
+                pano_lng = float(loc.get("lng", lng))
+                pano_id = meta.get("pano_id")
+            else:
+                # ❗ 여기서 바로 return 하지 않고, 그냥 원래 좌표로 Static API 한 번 호출
+                print(f"[StreetView metadata] status={status}, 원좌표로 직접 조회 시도")
+                pano_lat = lat
+                pano_lng = lng
+                pano_id = None
+        except Exception as e:
+            # 메타데이터 호출 실패 시에도 그냥 원좌표로 시도
+            print(f"[StreetView metadata] 조회 실패, 원좌표로 fallback: {e}")
+            pano_lat = lat
+            pano_lng = lng
+            pano_id = None
+
+        # 2) heading 자동 계산 옵션 (지금은 0/180 넘겨 쓰고 있으니 그대로 사용)
+        if heading is None:
+            try:
+                heading = self._compute_heading(pano_lat, pano_lng, lat, lng)
+            except Exception as e:
+                print(f"[StreetView heading] 자동 계산 실패, 기본값 0 사용: {e}")
+                heading = 0
 
         base_url = "https://maps.googleapis.com/maps/api/streetview"
         params = {
-            "location": f"{lat},{lng}",
             "size": f"{width}x{height}",
             "heading": str(heading),
             "pitch": str(pitch),
             "fov": str(fov),
             "key": self.google_maps_api_key,
         }
+
+        if pano_id:
+            params["pano"] = pano_id
+        else:
+            params["location"] = f"{pano_lat},{pano_lng}"
 
         try:
             r = requests.get(base_url, params=params, timeout=10)
