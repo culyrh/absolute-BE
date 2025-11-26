@@ -889,8 +889,8 @@ class LLMReportService:
                     justify-content: center;
                     padding: 4px 10px;
                     border-radius: 999px;
-                    background: #e0f2fe;
-                    color: #0ea5e9;
+                    background: #487d6a;
+                    color: #ffffff;
                     font-weight: 800;
                     font-size: 12px;
                     min-width: 86px;
@@ -1150,8 +1150,21 @@ class LLMReportService:
                         padding: 40px 48px;
                     }}
                 }}
+                .basic-table .location-map-inner {{
+                    position: absolute;
+                    inset: 8px;
+                    border-radius: 10px;
+                    overflow: hidden;
+                }}
 
-
+                .basic-table .location-map-inner #report-map {{
+                    width: 100%;
+                    height: 100%;
+                }}
+                #report-map a[href^="http://map.kakao.com"],
+                #report-map img[src*="m_bi_b.png"] {{
+                    display: none !important;
+                }}
             </style>
         </head>
         <body>
@@ -1175,7 +1188,11 @@ class LLMReportService:
                         </colgroup>
                         <tr>
                             <!-- 위치도 들어갈 정사각형 칸 -->
-                            <td class="location-box" rowspan="6"></td>
+                            <td class="location-box" rowspan="6">
+                                <div class="location-map-inner">
+                                    {map_html}
+                                </div>
+                            </td>
                             <th class="label">주유소 이름</th>
                             <td colspan="3">{station_name}</td>
                         </tr>

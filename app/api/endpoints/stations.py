@@ -939,85 +939,78 @@ async def generate_station_report(
             stats_payload=stats_payload,
         )
 
-        if nearby_parcels is not None and not nearby_parcels.empty:
-            # 필지별로 그리기 (최대 200개)
-            for idx, row in nearby_parcels.head(200).iterrows():
-                # 면적 계산
-                area = row.geometry.area * (111000 ** 2)
+        # ------------------------------
+        # 4. 카카오 지도 (정적처럼 고정)
+        # ------------------------------
+        js_key = "ef6066b015b62cbc9689dbf67268deb1"
 
-                # 크기별 색상
-                if area < 300:
-                    color = '#3498db'  # 파랑
-                    label = '소형'
-                elif area < 1000:
-                    color = '#2ecc71'  # 초록
-                    label = '중형'
-                elif area < 3000:
-                    color = '#f39c12'  # 주황
-                    label = '대형'
-                else:
-                    color = '#e74c3c'  # 빨강
-                    label = '초대형'
+        map_html = f"""
+        <div id="report-map"
+            style="width:100%;height:100%;border-radius:12px;overflow:hidden;"></div>
 
-                folium.GeoJson(
-                    row.geometry,
-                    style_function=lambda x, c=color: {
-                        'fillColor': c,
-                        'color': 'black',
-                        'weight': 0.5,
-                        'fillOpacity': 0.4
-                    },
-                    tooltip=f"{label} - {row.get('JIBUN', 'N/A')} - {area:.0f}㎡"
-                ).add_to(m)
-        
-        # 3-2. 주유소 마커
-        popup_html = f"""
-        <div style='white-space: normal; width: 260px; line-height: 1.4;'>
-            <div style='font-weight: 600; margin-bottom: 4px;'>{escape(str(name))}</div>
-            <div>{escape(str(address))}</div>
-        </div>
+        <script>
+            (function () {{
+            var script = document.createElement('script');
+            script.src = "https://dapi.kakao.com/v2/maps/sdk.js?autoload=false&appkey={js_key}&libraries=services";
+            script.onload = function () {{
+                kakao.maps.load(function () {{
+                var container = document.getElementById('report-map');
+                if (!container) return;
+
+                // 화면 기본 중심
+                var center = new kakao.maps.LatLng({lat}, {lng});
+                // 🔽 인쇄할 때는 지도를 조금 위로 올려서(위도 +) 마커가 아래쪽에 보이게
+                var printCenter = new kakao.maps.LatLng({lat} + 0.0016, {lng});
+
+                var map = new kakao.maps.Map(container, {{
+                    center: center,
+                    level: 4
+                }});
+
+                // 커스텀 마커
+                var imageSrc = "https://absolute-beryl.vercel.app/public/marker_green.png";
+                var imageSize = new kakao.maps.Size(36, 43);
+                var imageOption = {{ offset: new kakao.maps.Point(18, 43) }};
+                var markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption);
+
+                var marker = new kakao.maps.Marker({{
+                    position: center,
+                    image: markerImage
+                }});
+                marker.setMap(map);
+
+                map.setDraggable(false);
+                map.setZoomable(false);
+                map.setKeyboardShortcuts(false);
+
+                // 전역에 저장해 두기
+                window.reportMap = map;
+                window.reportMapCenter = center;
+                window.reportMapPrintCenter = printCenter;
+
+                function handleBeforePrint() {{
+                    if (!window.reportMap) return;
+                    window.reportMap.relayout();
+                    window.reportMap.setCenter(window.reportMapPrintCenter);
+                }}
+
+                function handleAfterPrint() {{
+                    if (!window.reportMap) return;
+                    window.reportMap.relayout();
+                    window.reportMap.setCenter(window.reportMapCenter);
+                }}
+
+                window.addEventListener('beforeprint', handleBeforePrint);
+                window.addEventListener('afterprint', handleAfterPrint);
+                }});
+            }};
+            document.head.appendChild(script);
+            }})();
+
+
+        </script>
         """
-        folium.Marker(
-            [lat, lng],
-            popup=folium.Popup(popup_html, max_width=320, min_width=220),
-            tooltip=name,
-            icon=folium.Icon(color='red', icon='gas-pump', prefix='fa')
-        ).add_to(m)
-        
-        # 3-3. 반경 표시
-        folium.Circle(
-            [lat, lng],
-            radius=300,
-            color='red',
-            fill=True,
-            fillOpacity=0.1,
-            popup='반경 300m'
-        ).add_to(m)
-        
-        # 범례 추가
-        legend_html = '''
-        <div style="position: absolute; bottom: 20px; left: 20px;
-                    background: rgba(255, 255, 255, 0.95); padding: 12px 16px; border: 1px solid #ccc;
-                    border-radius: 5px; z-index: 500; font-size: 13px; line-height: 1.4;">
-            <p style="margin: 0 0 10px 0; font-weight: bold;">필지 크기</p>
-            <p style="margin: 5px 0;">
-                <span style="background: #3498db; padding: 3px 10px;">　</span> 소형 (&lt;300㎡)
-            </p>
-            <p style="margin: 5px 0;">
-                <span style="background: #2ecc71; padding: 3px 10px;">　</span> 중형 (300-1000㎡)
-            </p>
-            <p style="margin: 5px 0;">
-                <span style="background: #f39c12; padding: 3px 10px;">　</span> 대형 (1000-3000㎡)
-            </p>
-            <p style="margin: 5px 0;">
-                <span style="background: #e74c3c; padding: 3px 10px;">　</span> 초대형 (&gt;3000㎡)
-            </p>
-        </div>
-        '''
-        m.get_root().html.add_child(folium.Element(legend_html))
-        
-        map_html = m._repr_html_()
-
+        # ------------------------------
         html = report_service.build_report_html(
             station=station,
             report_date=datetime.now(),

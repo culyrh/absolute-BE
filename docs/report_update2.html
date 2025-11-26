@@ -199,8 +199,8 @@
       justify-content: center;
       padding: 4px 10px;
       border-radius: 999px;
-      background: #e0f2fe;
-      color: #0ea5e9;
+      background: #487d6a;
+      color: #ffffff;
       font-weight: 800;
       font-size: 12px;
       min-width: 86px;
@@ -529,6 +529,23 @@
         padding: 40px 48px;
       }
     }
+
+    .basic-table .location-map-inner {
+      position: absolute;
+      inset: 8px;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .basic-table .location-map-inner #report-map {
+      width: 100%;
+      height: 100%;
+    }
+
+    #report-map a[href^="http://map.kakao.com"],
+    #report-map img[src*="m_bi_b.png"] {
+      display: none !important;
+    }
   </style>
 </head>
 
@@ -538,7 +555,7 @@
   <article class="report">
     <header>
       <div class="title">폐·휴업주유소실태조사보고서</div>
-      <div class="date">작성일시: 2025-11-26 21:31</div>
+      <div class="date">작성일시: 2025-11-27 01:39</div>
     </header>
 
     <section class="section">
@@ -553,7 +570,75 @@
         </colgroup>
         <tr>
           <!-- 위치도 들어갈 정사각형 칸 -->
-          <td class="location-box" rowspan="6"></td>
+          <td class="location-box" rowspan="6">
+            <div class="location-map-inner">
+
+              <div id="report-map" style="width:100%;height:100%;border-radius:12px;overflow:hidden;"></div>
+
+              <script>
+                (function () {
+                  var script = document.createElement('script');
+                  script.src = "https://dapi.kakao.com/v2/maps/sdk.js?autoload=false&appkey=ef6066b015b62cbc9689dbf67268deb1&libraries=services";
+                  script.onload = function () {
+                    kakao.maps.load(function () {
+                      var container = document.getElementById('report-map');
+                      if (!container) return;
+
+                      // 화면 기본 중심
+                      var center = new kakao.maps.LatLng(35.689819, 128.445642);
+                      // 🔽 인쇄할 때는 지도를 조금 위로 올려서(위도 +) 마커가 아래쪽에 보이게
+                      var printCenter = new kakao.maps.LatLng(35.689819 + 0.0012, 128.445642);
+
+                      var map = new kakao.maps.Map(container, {
+                        center: center,
+                        level: 4
+                      });
+
+                      // 커스텀 마커
+                      var imageSrc = "https://absolute-beryl.vercel.app/public/marker_green.png";
+                      var imageSize = new kakao.maps.Size(36, 43);
+                      var imageOption = { offset: new kakao.maps.Point(18, 43) };
+                      var markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption);
+
+                      var marker = new kakao.maps.Marker({
+                        position: center,
+                        image: markerImage
+                      });
+                      marker.setMap(map);
+
+                      map.setDraggable(false);
+                      map.setZoomable(false);
+                      map.setKeyboardShortcuts(false);
+
+                      // 전역에 저장해 두기
+                      window.reportMap = map;
+                      window.reportMapCenter = center;
+                      window.reportMapPrintCenter = printCenter;
+
+                      function handleBeforePrint() {
+                        if (!window.reportMap) return;
+                        window.reportMap.relayout();
+                        window.reportMap.setCenter(window.reportMapPrintCenter);
+                      }
+
+                      function handleAfterPrint() {
+                        if (!window.reportMap) return;
+                        window.reportMap.relayout();
+                        window.reportMap.setCenter(window.reportMapCenter);
+                      }
+
+                      window.addEventListener('beforeprint', handleBeforePrint);
+                      window.addEventListener('afterprint', handleAfterPrint);
+                    });
+                  };
+                  document.head.appendChild(script);
+                })();
+
+
+              </script>
+
+            </div>
+          </td>
           <th class="label">주유소 이름</th>
           <td colspan="3">동흥주유소</td>
         </tr>
@@ -577,8 +662,8 @@
         </tr>
         <tr>
           <th class="label">주변환경</th>
-          <td colspan="3">동흥주유소는 대구광역시 달성군 현풍면 비슬로에 위치하며, 주변은 주거지역과 농경지, 산림이 혼재된 환경입니다. 위성사진과 주유소 위치를 근거로, 교통량이 많은 도로변에
-            위치하며, 상업시설이나 관광지와는 다소 거리가 있어 조용하고 자연 친화적인 환경이 특징입니다.</td>
+          <td colspan="3">동흥주유소는 대구광역시 달성군 현풍면의 비슬로에 위치하며, 주변은 주거지역과 농경지, 소규모 상업시설이 혼재된 환경입니다. 위성사진상으로는 교통량이 많은 도로변에
+            자리잡아 있으며, 주변은 자연환경과 함께 일부 판매시설이 자리잡고 있어 접근성과 유동인구가 높은 입지입니다.</td>
         </tr>
       </table>
       <p class="subtle">좌표: 위도 35.689819409439494, 경도 128.44564281922678</p>
@@ -587,9 +672,9 @@
 
     <section class="section">
       <h2>2. 조사 현황</h2>
-      <div class="text-box">• 로드뷰1은 주유소 인근 도로가 넓고 교통량이 높으며, 차량이 활발히 다니는 모습이 확인됩니다.
-        • 분석 지표에 따르면 일교통량이 매우 높아 차량 유동이 많은 입지임을 알 수 있으며, 인구수와 관광지수도 높은 수준으로 지역 유동인구가 상당히 존재합니다.
-        • 상권지수와 필지수는 낮아 주변 상권 활성화는 제한적일 가능성이 있으며, 반경 300m 내 필지 통계도 부족하여 개발 잠재력은 신중히 검토해야 합니다.</div>
+      <div class="text-box">• 로드뷰를 통해 주변 도로와 인근 시설의 현장 상태를 확인할 수 있으며, 교통량과 접근성은 매우 높게 평가됩니다.
+        • 상권지수는 낮은 편이지만, 인구수와 교통량이 높아 잠재적 고객 유입 가능성이 존재합니다.
+        • 반경 내 필지 수가 적어 개발 가능성은 제한적이나, 주변환경과 교통량을 고려할 때 도시 재생의 기회가 있습니다.</div>
     </section>
 
     <section class="section">
@@ -750,16 +835,17 @@
           <div class="rank-card-header"><span class="rank-title">1순위: 자동차관련시설</span></div>
           <div class="rank-card-body">
             <div class="usage-line">
-              <div class="reason-label">자동차 정비 및 서비스 센터</div>
-              <div>• 높은 교통량과 차량 유동성을 고려할 때, 정비 및 차량 관련 서비스 시설은 안정적인 수익 창출이 가능하며, 주변 환경과도 적합합니다.</div>
+              <div class="reason-label">차량 정비 및 서비스 센터</div>
+              <div>• 높은 교통량과 유동인구를 고려할 때, 차량 정비 및 부대 서비스 시설은 고객 유치에 효과적입니다. 주변환경과의 연계성을 강화하여 부동산 가치 상승도 기대할 수 있습니다.
+              </div>
             </div>
             <div class="usage-line">
-              <div class="reason-label">주유소 리모델링 및 부대시설 확장</div>
-              <div>• 기존 주유소의 활용도를 높이고, 고객 편의성을 강화하는 전략으로 지역 교통량을 활용한 부가 수익 증대가 기대됩니다.</div>
+              <div class="reason-label">주유소 리모델링 및 확장</div>
+              <div>• 기존 주유소의 기능을 강화하고, 주변 교통량을 활용한 신규 판매시설 또는 서비스 공간을 마련하여 수익성을 높일 수 있습니다.</div>
             </div>
             <div class="usage-line">
-              <div class="reason-label">자동차 용품 판매점</div>
-              <div>• 차량 이용 고객이 많은 입지 특성을 반영하여, 자동차 용품 및 액세서리 판매를 통한 부가 수익 창출이 적합합니다.</div>
+              <div class="reason-label">전기차 충전소 설치</div>
+              <div>• 전기차 이용이 증가하는 추세에 부합하며, 교통량이 많은 입지 특성을 활용하여 친환경 부동산 활용 전략으로 적합합니다.</div>
             </div>
           </div>
         </div>
@@ -767,16 +853,16 @@
           <div class="rank-card-header"><span class="rank-title">2순위: 판매시설</span></div>
           <div class="rank-card-body">
             <div class="usage-line">
-              <div class="reason-label">편의점 또는 소형마트</div>
-              <div>• 높은 인구수와 차량 유동성을 활용하여, 편의점이나 소형마트는 지역 주민과 차량 이용객 모두를 대상으로 안정적 매출이 기대됩니다.</div>
+              <div class="reason-label">편의점 또는 소규모 판매시설</div>
+              <div>• 높은 교통량과 인구 유입을 고려할 때, 편의점과 같은 판매시설은 고객 방문을 유도하고 매출 증대에 기여할 수 있습니다. 지역 특성에 맞는 상품 구성이 중요합니다.</div>
             </div>
             <div class="usage-line">
-              <div class="reason-label">지역 특산품 판매점</div>
-              <div>• 자연 친화적 환경과 관광지와의 거리로 인해, 지역 특산품이나 농산물 판매를 통해 지역경제 활성화와 관광객 유치가 가능합니다.</div>
+              <div class="reason-label">지역 특산품 판매장</div>
+              <div>• 지역 관광지와 연계하여 지역 특산품 또는 농산물 판매장을 조성하면, 관광객과 지역 주민 모두를 유인하는 효과가 기대됩니다.</div>
             </div>
             <div class="usage-line">
-              <div class="reason-label">자동차 용품 및 정비용품 판매점</div>
-              <div>• 자동차 관련 수요가 높아, 차량 정비 및 용품 판매를 병행하는 전략이 유망합니다.</div>
+              <div class="reason-label">자동차 용품 및 부품 판매점</div>
+              <div>• 자동차 관련 시설과 연계하여 부품 판매 또는 용품 판매점을 설치하면, 교통량과 인구수의 증가에 따른 수익 창출이 가능합니다.</div>
             </div>
           </div>
         </div>
@@ -785,15 +871,15 @@
           <div class="rank-card-body">
             <div class="usage-line">
               <div class="reason-label">지역 커뮤니티 센터 또는 문화공간</div>
-              <div>• 자연환경과 조용한 환경을 활용하여, 지역 주민 대상 커뮤니티 공간이나 문화시설 조성으로 도시 재생 효과를 기대할 수 있습니다.</div>
+              <div>• 지역 인구수와 교통량이 높아 커뮤니티 활성화와 도시 재생을 위한 공간 마련이 가능하며, 지역 주민과 방문객의 교류를 촉진할 수 있습니다.</div>
             </div>
             <div class="usage-line">
-              <div class="reason-label">친환경 주차장 또는 휴게 공간</div>
-              <div>• 환경 친화적 개발과 자연경관을 고려한 휴게 공간 조성으로, 지역 정체성과 관광 활성화에 기여할 수 있습니다.</div>
+              <div class="reason-label">녹지공간 및 휴게공간 조성</div>
+              <div>• 자연환경과 인구밀집도를 고려하여, 녹지와 휴게공간을 조성하면 지역 정주환경 개선과 도시 미관 향상에 기여할 수 있습니다.</div>
             </div>
             <div class="usage-line">
-              <div class="reason-label">농산물 직거래장터 또는 체험장</div>
-              <div>• 지역 농경지와 연계하여, 농산물 직거래 또는 체험 프로그램을 통해 지역경제와 관광객 유입을 증대시킬 수 있습니다.</div>
+              <div class="reason-label">지역 관광 및 체험시설 연계</div>
+              <div>• 관광지와 연계한 체험시설 또는 문화행사 공간을 마련하여, 관광객 유입과 지역경제 활성화를 도모할 수 있습니다.</div>
             </div>
           </div>
         </div>
